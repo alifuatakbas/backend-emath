@@ -15,7 +15,7 @@ class ExamResultResponse(BaseModel):
     score_percentage: float
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ExamCreateRequest(BaseModel):
     title: str
@@ -32,4 +32,4 @@ class ExamSCH(BaseModel):
     questions: List[QuestionSCH]  # Sınavın soruları
 
     class Config:
-        orm_mode = True
+        from_attributes = True
