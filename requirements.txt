@@ -1,0 +1,10 @@
+passlib[bcrypt]~=1.7.4
+fastapi~=0.115.6
+sqlmodel~=0.0.22
+pydantic~=2.10.3
+PyJWT~=2.10.1
+SQLAlchemy~=2.0.36
+pydantic-settings>=2.0.0
+python-multipart>=0.0.5
+python-dotenv==1.0.0
+uvicorn~=0.32.1
