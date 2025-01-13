@@ -3,7 +3,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # MySQL Bağlantısı: Burada kendi MySQL bağlantı bilgilerinizi girmelisiniz
-SQLALCHEMY_DATABASE_URL = "mysql://root:TAWvYMfQHkHRPgUisDDJMeLLwGxZwbtL@mysql-pjqi.railway.internal:3306/railway"
+SQLALCHEMY_DATABASE_URL = "mysql+mysqlconnector://root:TAWvYMfQHkHRPgUisDDJMeLLwGxZwbtL@mysql-pjqi.railway.internal:3306/railway"
+
 
 # SQLAlchemy motorunu oluşturuyoruz
 engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_size=10, max_overflow=20)
