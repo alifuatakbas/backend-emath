@@ -94,6 +94,7 @@ def submit_exam(
         raise HTTPException(status_code=400, detail="Exam not started")
 
     now = datetime.utcnow()
+    # Check if the exam time has expired based on ends_at
     if now > existing_result.ends_at:
         raise HTTPException(status_code=400, detail="Exam time is over")
 
@@ -222,20 +223,3 @@ async def get_exam(
         questions=questions_with_options
     )
 
-@router.post("/start-exam/{exam_id}")
-def start_exam(exam_id: int, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Exam not found")
-
-    now = datetime.utcnow()
-    end_time = now + timedelta(minutes=90)
-
-    exam_result = ExamResult(
-        user_id=current_user.id,
-        exam_id=exam_id,
-        started_at=now,
-        ends_at=end_time
-    )
-    db.add(exam_result)
-    db.commit()

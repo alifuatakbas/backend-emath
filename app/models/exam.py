@@ -43,7 +43,7 @@ class ExamResult(Base):
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
     started_at = Column(DateTime, default=datetime.utcnow)
-    ends_at = Column(DateTime)
+    ends_at = Column(DateTime)  # New field to store end time
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
