@@ -22,6 +22,4 @@ app.add_middleware(
 )
 
 # Health check endpoint
-@app.get("/health")
-def health_check():
-    return {"status": "OK"}
+
