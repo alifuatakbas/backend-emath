@@ -73,11 +73,7 @@ def add_question(
 
 
 @router.get("/exam/{exam_id}/time-check", response_model=ExamTimeInfo)
-async def check_exam_time(
-        exam_id: int,
-        db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user)
-):
+async def check_exam_time(exam_id: int, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Sınav bulunamadı")
@@ -106,14 +102,14 @@ async def check_exam_time(
             message=f"Sınavınız devam ediyor. Kalan süre: {remaining_minutes} dakika"
         )
 
-    if now < exam.start_time:
+    if now < datetime.combine(exam.start_time, datetime.min.time()):
         return ExamTimeInfo(
             remaining_minutes=exam.duration_minutes,
             can_start=False,
             message="Sınav henüz başlamadı"
         )
 
-    if now > exam.end_time:
+    if now > datetime.combine(exam.end_time, datetime.min.time()):
         return ExamTimeInfo(
             remaining_minutes=0,
             can_start=False,
@@ -134,7 +130,7 @@ def start_exam(exam_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Exam not found")
 
     now = datetime.utcnow()
-    if now < exam.start_time:
+    if now < datetime.combine(exam.start_time, datetime.min.time()):
         raise HTTPException(status_code=400, detail="Exam has not started yet")
 
     exam.start_time = now
