@@ -1,21 +1,18 @@
-# models/exam.py
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import datetime
 
 class Exam(Base):
     __tablename__ = "exams"
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     is_published = Column(Boolean, default=False)
-    start_time = Column(DateTime, nullable=False)  # Sınavın başlama zamanı
-    end_time = Column(DateTime, nullable=False)    # Sınavın giriş bitiş zamanı
-    duration_minutes = Column(Integer, default=90) # Sınav süresi (dakika)
 
     questions = relationship("Question", back_populates="exam")
     exam_results = relationship("ExamResult", back_populates="exam")
-    question_counter = Column(Integer, default=0)
+
+    question_counter = Column(Integer, default=0)  # Yeni eklenen soru sayısını tutmak için
+
 
 class Question(Base):
     __tablename__ = "questions"
@@ -23,15 +20,16 @@ class Question(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     text = Column(String, nullable=False)
     image = Column(String, nullable=True)
-    question_id = Column(Integer)  # Her sınav için sıralı soru numarası
 
+    # Seçeneklerin metinleri
     option_1 = Column(String, default="A")
     option_2 = Column(String, default="B")
     option_3 = Column(String, default="C")
     option_4 = Column(String, default="D")
     option_5 = Column(String, default="E")
 
-    correct_option_id = Column(Integer, nullable=False)
+    # Doğru cevabın ID'si
+    correct_option_id = Column(Integer, nullable=False)  # 1, 2, 3, 4, 5
 
     exam = relationship("Exam", back_populates="questions")
 
@@ -42,11 +40,6 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
-    started_at = Column(DateTime, nullable=True)  # Öğrencinin sınava başlama zamanı
-    ends_at = Column(DateTime, nullable=True)     # Öğrencinin sınav bitiş zamanı
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
-
-
-

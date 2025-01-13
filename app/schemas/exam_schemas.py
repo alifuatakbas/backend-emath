@@ -1,13 +1,12 @@
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
+from typing import List
 
-class QuestionAnswer(BaseModel):
+class QuestionAnswerSubmission(BaseModel):
     question_id: int
     selected_option_id: int
 
 class ExamSubmission(BaseModel):
-    answers: List[QuestionAnswer]
+    answers: List[QuestionAnswerSubmission]
 
 class ExamResultResponse(BaseModel):
     correct_answers: int
@@ -15,11 +14,11 @@ class ExamResultResponse(BaseModel):
     total_questions: int
     score_percentage: float
 
+    class Config:
+        from_attributes = True
+
 class ExamCreateRequest(BaseModel):
     title: str
-    start_time: datetime
-    end_time: datetime
-    duration_minutes: int = 90
 
 class QuestionSCH(BaseModel):
     id: int
@@ -30,9 +29,7 @@ class ExamSCH(BaseModel):
     id: int
     title: str
     is_published: bool
-    questions: List[QuestionSCH]
+    questions: List[QuestionSCH]  # Sınavın soruları
 
-class ExamTimeInfo(BaseModel):
-    remaining_minutes: int
-    can_start: bool
-    message: str
+    class Config:
+        from_attributes = True
