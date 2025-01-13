@@ -5,7 +5,7 @@ from database import get_db
 from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
-
+from datetime import datetime, timedelta
 router = APIRouter()
 User = UserDB
 
@@ -86,21 +86,16 @@ def submit_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Check if the user has already submitted the exam
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
     ).first()
-    if existing_result:
-        raise HTTPException(status_code=400, detail="Exam already submitted")
+    if not existing_result:
+        raise HTTPException(status_code=400, detail="Exam not started")
 
-    # Check if the exam exists
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Exam not found")
-
-    # Calculate the total number of questions
-    total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
+    now = datetime.utcnow()
+    if now > existing_result.ends_at:
+        raise HTTPException(status_code=400, detail="Exam time is over")
 
     # Calculate correct and incorrect answers
     correct_count = 0
@@ -117,22 +112,16 @@ def submit_exam(
         else:
             incorrect_count += 1
 
-    score_percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
+    score_percentage = (correct_count / len(submission.answers)) * 100 if len(submission.answers) > 0 else 0
 
-    # Save the exam result
-    exam_result = ExamResult(
-        user_id=current_user.id,
-        exam_id=exam_id,
-        correct_answers=correct_count,
-        incorrect_answers=incorrect_count
-    )
-    db.add(exam_result)
+    existing_result.correct_answers = correct_count
+    existing_result.incorrect_answers = incorrect_count
     db.commit()
 
     return ExamResultResponse(
         correct_answers=correct_count,
         incorrect_answers=incorrect_count,
-        total_questions=total_questions,
+        total_questions=len(submission.answers),
         score_percentage=score_percentage
     )
 
@@ -233,3 +222,20 @@ async def get_exam(
         questions=questions_with_options
     )
 
+@router.post("/start-exam/{exam_id}")
+def start_exam(exam_id: int, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+
+    now = datetime.utcnow()
+    end_time = now + timedelta(minutes=90)
+
+    exam_result = ExamResult(
+        user_id=current_user.id,
+        exam_id=exam_id,
+        started_at=now,
+        ends_at=end_time
+    )
+    db.add(exam_result)
+    db.commit()
