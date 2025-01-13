@@ -10,12 +10,15 @@ from app.services.auth_service import (
     get_current_user
 )
 from database import get_db
+import logging
 
 router = APIRouter()
 
 
 @router.post("/register", response_model=User)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
+    logging.info(f"Received user data: {user}")
+
     # Email kontrolü
     db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     if db_user:
@@ -31,7 +34,6 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_user)
     return db_user
-
 
 @router.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
