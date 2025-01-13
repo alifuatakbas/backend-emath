@@ -128,44 +128,20 @@ async def check_exam_time(
 
 
 @router.post("/start-exam/{exam_id}")
-async def start_exam(
-        exam_id: int,
-        db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user)
-):
+def start_exam(exam_id: int, db: Session = Depends(get_db)):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+        raise HTTPException(status_code=404, detail="Exam not found")
 
     now = datetime.utcnow()
-
     if now < exam.start_time:
-        raise HTTPException(status_code=400, detail="Sınav henüz başlamadı")
-    if now > exam.end_time:
-        raise HTTPException(status_code=400, detail="Sınav giriş süresi sona erdi")
+        raise HTTPException(status_code=400, detail="Exam has not started yet")
 
-    existing_result = db.query(ExamResult).filter(
-        ExamResult.user_id == current_user.id,
-        ExamResult.exam_id == exam_id
-    ).first()
-
-    if existing_result and existing_result.started_at:
-        raise HTTPException(status_code=400, detail="Sınava zaten başladınız")
-
-    exam_result = ExamResult(
-        user_id=current_user.id,
-        exam_id=exam_id,
-        started_at=now,
-        ends_at=now + timedelta(minutes=exam.duration_minutes)
-    )
-    db.add(exam_result)
+    exam.start_time = now
+    exam.end_time = now + timedelta(minutes=exam.duration_minutes)
     db.commit()
-
-    return {
-        "message": "Sınav başlatıldı",
-        "started_at": exam_result.started_at,
-        "ends_at": exam_result.ends_at
-    }
+    db.refresh(exam)
+    return {"message": "Exam started", "start_time": exam.start_time, "end_time": exam.end_time}
 
 
 @router.post("/submit-exam/{exam_id}", response_model=ExamResultResponse)
