@@ -9,8 +9,8 @@ class Exam(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     is_published = Column(Boolean, default=False)
-    start_time = Column(DateTime, nullable=True)  # Sınavın başlama zamanı
-    end_time = Column(DateTime, nullable=True)    # Sınavın giriş bitiş zamanı
+    start_time = Column(DateTime, nullable=False)  # Sınavın başlama zamanı
+    end_time = Column(DateTime, nullable=False)    # Sınavın giriş bitiş zamanı
     duration_minutes = Column(Integer, default=90) # Sınav süresi (dakika)
 
     questions = relationship("Question", back_populates="exam")
