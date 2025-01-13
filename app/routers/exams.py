@@ -92,12 +92,12 @@ def submit_exam(
         ExamResult.exam_id == exam_id
     ).first()
     if existing_result:
-        raise HTTPException(status_code=400, detail="Bu sınav zaten çözülmüş")
+        raise HTTPException(status_code=400, detail="Sınav zaten çözülmüş")
 
     # Check if the exam exists
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+        raise HTTPException(status_code=404, detail="Exam not found")
 
     # Calculate the total number of questions
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
@@ -109,7 +109,7 @@ def submit_exam(
     for question_answer in submission.answers:
         question = db.query(Question).filter(Question.id == question_answer.question_id).first()
         if not question:
-            raise HTTPException(status_code=404, detail=f"Soru {question_answer.question_id} bulunamadı")
+            raise HTTPException(status_code=404, detail=f"Question {question_answer.question_id} not found")
 
         correct_option_index = question.correct_option_id
         if question_answer.selected_option_id == correct_option_index:
@@ -207,30 +207,29 @@ async def publish_exam(
         questions=questions_with_options
     )
 
-@router.get("/exams/{exam_id}", response_model=ExamSCH)
-async def get_exam(
-    exam_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+
+@router.get("/exams/{exam_id}")
+def get_exam(
+        exam_id: int,
+        current_user: UserDB = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ):
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+        raise HTTPException(status_code=404, detail="Exam not found")
 
-    # Prepare questions with options
-    questions_with_options = []
-    for question in exam.questions:
-        options = [question.option_1, question.option_2, question.option_3, question.option_4, question.option_5]
-        questions_with_options.append(QuestionSCH(
-            id=question.id,
-            text=question.text,
-            options=options
-        ))
+    # Kullanıcı daha önce sınavı çözdüyse
+    existing_result = db.query(ExamResult).filter(
+        ExamResult.user_id == current_user.id,
+        ExamResult.exam_id == exam_id
+    ).first()
 
-    return ExamSCH(
-        id=exam.id,
-        title=exam.title,
-        is_published=exam.is_published,
-        questions=questions_with_options
-    )
+    # Sınav verisini dönerken 'has_been_taken' bilgisini de ekliyoruz
+    return {
+        "id": exam.id,
+        "title": exam.title,
+        "questions": [{"id": q.id, "text": q.text, "options": q.options} for q in exam.questions],
+        "has_been_taken": bool(existing_result),  # Sınavı çözmüş mü?
+    }
+
 
