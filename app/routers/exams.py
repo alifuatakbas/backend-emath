@@ -224,12 +224,28 @@ def get_exam(
         ExamResult.exam_id == exam_id
     ).first()
 
-    # Sınav verisini dönerken 'has_been_taken' bilgisini de ekliyoruz
+    # Soruların options'larını da içerecek şekilde veriyi döndürüyoruz
+    questions = []
+    for question in exam.questions:
+        options = [
+            question.option_1,
+            question.option_2,
+            question.option_3,
+            question.option_4,
+            question.option_5
+        ]
+        questions.append({
+            "id": question.id,
+            "text": question.text,
+            "options": options,  # options burada bir liste olarak döndürülüyor
+            "correct_option_id": question.correct_option_id
+        })
+
     return {
         "id": exam.id,
         "title": exam.title,
-        "questions": [{"id": q.id, "text": q.text, "options": q.options} for q in exam.questions],
-        "has_been_taken": bool(existing_result),  # Sınavı çözmüş mü?
+        "questions": questions,
+        "has_been_taken": bool(existing_result)
     }
 
 
