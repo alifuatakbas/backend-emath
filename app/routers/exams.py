@@ -92,12 +92,12 @@ def submit_exam(
         ExamResult.exam_id == exam_id
     ).first()
     if existing_result:
-        raise HTTPException(status_code=400, detail="Exam already submitted")
+        raise HTTPException(status_code=400, detail="Bu sınav zaten çözülmüş")
 
     # Check if the exam exists
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
-        raise HTTPException(status_code=404, detail="Exam not found")
+        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
     # Calculate the total number of questions
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
@@ -109,7 +109,7 @@ def submit_exam(
     for question_answer in submission.answers:
         question = db.query(Question).filter(Question.id == question_answer.question_id).first()
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_answer.question_id} not found")
+            raise HTTPException(status_code=404, detail=f"Soru {question_answer.question_id} bulunamadı")
 
         correct_option_index = question.correct_option_id
         if question_answer.selected_option_id == correct_option_index:
