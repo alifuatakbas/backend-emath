@@ -35,6 +35,8 @@ class Question(Base):
     exam = relationship("Exam", back_populates="questions")
 
 
+
+
 class ExamResult(Base):
     __tablename__ = "exam_results"
 
