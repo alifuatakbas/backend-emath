@@ -11,6 +11,11 @@ from app.services.auth_service import (
 )
 from database import get_db
 import logging
+from app.schemas.auth_schemas import ForgotPasswordRequest, ResetPasswordRequest
+from app.services.email import send_reset_email
+from jose import jwt
+from datetime import datetime, timedelta
+import os
 
 router = APIRouter()
 
@@ -50,3 +55,57 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 @router.get("/users/me", response_model=User)
 async def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+
+
+router = APIRouter()
+
+
+# Şifremi unuttum endpoint'i
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.email == request.email).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+        )
+
+    # Reset token oluştur
+    token_data = {
+        "sub": user.email,
+        "exp": datetime.utcnow() + timedelta(minutes=30)
+    }
+    reset_token = jwt.encode(token_data, os.getenv("SECRET_KEY"), algorithm="HS256")
+
+    # Email gönder
+    await send_reset_email(user.email, reset_token)
+
+    return {"message": "Şifre sıfırlama linki email adresinize gönderildi"}
+
+
+# Şifre sıfırlama endpoint'i
+@router.post("/reset-password")
+async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    try:
+        # Token'ı doğrula
+        payload = jwt.decode(request.token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        email = payload.get("sub")
+
+        user = db.query(UserDB).filter(UserDB.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+
+        # Yeni şifreyi hashle ve kaydet
+        hashed_password = get_password_hash(request.new_password)
+        user.hashed_password = hashed_password
+        db.commit()
+
+        return {"message": "Şifreniz başarıyla güncellendi"}
+
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz veya süresi dolmuş token"
+        )
