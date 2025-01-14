@@ -94,8 +94,13 @@ def submit_exam(
     if not existing_result:
         raise HTTPException(status_code=400, detail="Sınav başlatılmamış")
 
+    # Ensure end_time is a datetime object
+    end_time = existing_result.end_time
+    if isinstance(end_time, datetime.date) and not isinstance(end_time, datetime.datetime):
+        end_time = datetime.combine(end_time, datetime.min.time())
+
     # Check if the exam time has expired
-    if datetime.utcnow() > existing_result.end_time:
+    if datetime.utcnow() > end_time:
         raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
     # Calculate the total number of questions
