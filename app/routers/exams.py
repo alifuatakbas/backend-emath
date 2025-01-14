@@ -215,30 +215,23 @@ def start_exam(
         ).first()
 
         if existing_result:
-            # Sınav zaten başlatılmış, süre kontrolü yap
             current_time = datetime.utcnow()
             remaining_time = existing_result.end_time - current_time
-
-            if remaining_time.total_seconds() <= 0:
-                raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
-
-            # Süre dolmamışsa kalan süreyi hesapla
             remaining_minutes = int(remaining_time.total_seconds() / 60)
 
             return {
                 "message": "Sınav devam ediyor",
-                "start_time": existing_result.start_time.isoformat(),
-                "end_time": existing_result.end_time.isoformat(),
+                "start_time": existing_result.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "end_time": existing_result.end_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "remaining_minutes": remaining_minutes
             }
 
-        # Yeni sınav başlat
-        start_time = datetime.utcnow()
+        # Yeni sınav başlat - datetime formatını açıkça belirtelim
+        start_time = datetime.now(pytz.UTC)
         end_time = start_time + timedelta(minutes=90)
 
-        # Timezone'ları açıkça belirt
-        start_time = start_time.replace(tzinfo=pytz.UTC)
-        end_time = end_time.replace(tzinfo=pytz.UTC)
+        print(f"Debug - Start Time: {start_time}")  # Debug için
+        print(f"Debug - End Time: {end_time}")      # Debug için
 
         new_result = ExamResult(
             user_id=current_user.id,
@@ -253,17 +246,20 @@ def start_exam(
         db.commit()
         db.refresh(new_result)
 
+        print(f"Debug - Saved Start Time: {new_result.start_time}")  # Debug için
+        print(f"Debug - Saved End Time: {new_result.end_time}")      # Debug için
+
         return {
             "message": "Sınav başlatıldı",
-            "start_time": start_time.isoformat(),
-            "end_time": end_time.isoformat(),
+            "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
             "remaining_minutes": 90
         }
 
     except Exception as e:
-        print(f"Start exam error: {str(e)}")  # Hata ayıklama için
+        print(f"Start exam error: {str(e)}")
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Sınav başlatılırken bir hata oluştu: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/exam-time/{exam_id}")
 def get_exam_time_status(

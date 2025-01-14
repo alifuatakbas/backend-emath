@@ -43,9 +43,18 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
-    # DateTime tipini açıkça belirtelim
+
+    # DateTime kolonlarını açıkça tanımlayalım
     start_time = Column(DateTime(timezone=True), nullable=False)
     end_time = Column(DateTime(timezone=True), nullable=False)
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Eğer start_time ve end_time timezone içermiyorsa, UTC ekleyelim
+        if self.start_time and self.start_time.tzinfo is None:
+            self.start_time = self.start_time.replace(tzinfo=pytz.UTC)
+        if self.end_time and self.end_time.tzinfo is None:
+            self.end_time = self.end_time.replace(tzinfo=pytz.UTC)
