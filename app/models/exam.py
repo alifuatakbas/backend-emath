@@ -35,18 +35,15 @@ class Question(Base):
     exam = relationship("Exam", back_populates="questions")
 
 
-
-
 class ExamResult(Base):
     __tablename__ = "exam_results"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     exam_id = Column(Integer, ForeignKey("exams.id"))
-    correct_answers = Column(Integer)
-    incorrect_answers = Column(Integer)
+    correct_answers = Column(Integer, default=0)
+    incorrect_answers = Column(Integer, default=0)
     start_time = Column(DateTime, default=datetime.utcnow)
     end_time = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=90))
 
     user = relationship("UserDB", back_populates="exam_results")
-    exam = relationship("Exam", back_populates="results")
+    exam = relationship("Exam", back_populates="exam_results")
