@@ -98,22 +98,19 @@ def submit_exam(
 
     # Süre kontrolü yap
     current_time = datetime.utcnow()
-    if existing_result.end_time and isinstance(existing_result.end_time, datetime):
-        if current_time > existing_result.end_time:
+
+    if existing_result.end_time:
+        # end_time'ı datetime türüne güvenli bir şekilde dönüştür
+        if isinstance(existing_result.end_time, date) and not isinstance(existing_result.end_time, datetime):
+            # Eğer end_time sadece date türündeyse, datetime'a çevir
+            end_time = datetime.combine(existing_result.end_time, datetime.min.time())
+        else:
+            end_time = existing_result.end_time
+
+        if current_time > end_time:
             raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
     else:
-        # end_time'ı datetime'a çevir
-        try:
-            end_time = datetime.combine(existing_result.end_time, datetime.min.time())
-            if current_time > end_time:
-                raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
-        except Exception as e:
-            print(f"Time comparison error: {e}")
-            # Log the actual types for debugging
-            print(f"current_time type: {type(current_time)}")
-            print(f"end_time type: {type(existing_result.end_time)}")
-            print(f"end_time value: {existing_result.end_time}")
-            raise HTTPException(status_code=500, detail="Sınav süresi kontrolünde bir hata oluştu")
+        raise HTTPException(status_code=500, detail="Sınavın bitiş zamanı belirlenmemiş")
 
     # Toplam soru sayısını hesapla
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
