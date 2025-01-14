@@ -81,67 +81,8 @@ def check_submission_status(exam_id: int, current_user: UserDB = Depends(get_cur
     return {"hasSubmitted": has_submitted}
 
 
-@router.post("/submit-exam/{exam_id}", response_model=ExamResultResponse)
-def submit_exam(
-        exam_id: int,
-        submission: ExamSubmission,
-        current_user: UserDB = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    # Sınavın başlatılıp başlatılmadığını kontrol et
-    existing_result = db.query(ExamResult).filter(
-        ExamResult.user_id == current_user.id,
-        ExamResult.exam_id == exam_id
-    ).first()
 
-    if not existing_result:
-        raise HTTPException(status_code=400, detail="Sınav henüz başlatılmamış")
 
-    # Süre kontrolü
-    current_time = datetime.utcnow()
-
-    if isinstance(existing_result.end_time, datetime):
-        end_time = existing_result.end_time
-    else:
-        # end_time string ise datetime'a çevir
-        end_time = datetime.fromisoformat(str(existing_result.end_time).replace('Z', '+00:00'))
-
-    if current_time > end_time:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Sınav süresi dolmuş. Kalan süreniz: 0 dakika"
-        )
-
-    # Toplam soru sayısını hesapla
-    total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
-
-    # Doğru ve yanlış cevapları hesapla
-    correct_count = 0
-    incorrect_count = 0
-
-    for question_answer in submission.answers:
-        question = db.query(Question).filter(Question.id == question_answer.question_id).first()
-        if not question:
-            raise HTTPException(status_code=404, detail=f"Soru bulunamadı: {question_answer.question_id}")
-
-        if question_answer.selected_option_id == question.correct_option_id:
-            correct_count += 1
-        else:
-            incorrect_count += 1
-
-    score_percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
-
-    # Sonuçları kaydet
-    existing_result.correct_answers = correct_count
-    existing_result.incorrect_answers = incorrect_count
-    db.commit()
-
-    return ExamResultResponse(
-        correct_answers=correct_count,
-        incorrect_answers=incorrect_count,
-        total_questions=total_questions,
-        score_percentage=score_percentage
-    )
 
 @router.get("/exam-results/{exam_id}")
 def get_exam_results(
