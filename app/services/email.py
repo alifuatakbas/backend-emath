@@ -1,38 +1,65 @@
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pydantic import EmailStr
+from typing import List
 from dotenv import load_dotenv
 import os
+from pathlib import Path
 
-load_dotenv()
+# Debug için mevcut dizini yazdır
+current_dir = Path(__file__).parent.parent.parent
+print(f"Current directory: {current_dir}")
 
-conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
-    MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
-    MAIL_FROM=os.getenv('MAIL_FROM'),
-    MAIL_PORT=int(os.getenv('MAIL_PORT', '587')),
-    MAIL_SERVER=os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
-    MAIL_FROM_NAME=os.getenv('MAIL_FROM_NAME', 'System'),
-    MAIL_SSL_TLS=False,  # Değişti
-    MAIL_STARTTLS=True,  # Yeni eklendi
+# .env dosyasının tam yolunu belirt
+env_path = current_dir / '.env'
+print(f"Looking for .env at: {env_path}")
+
+# .env dosyasını yükle
+load_dotenv(dotenv_path=env_path)
+
+# Debug için environment değişkenlerini kontrol et
+print("Mail Settings Debug:")
+print(f"MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
+print(f"MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
+print(f"MAIL_PORT: {os.getenv('MAIL_PORT')}")
+
+# Doğrudan değerleri kullan
+email_conf = ConnectionConfig(
+    MAIL_USERNAME="akbasalifuat@gmail.com",  # Doğrudan değer
+    MAIL_PASSWORD="dbbomqqmapxzriwa",  # Doğrudan değer
+    MAIL_FROM="akbasalifuat@gmail.com",  # Doğrudan değer
+    MAIL_PORT=587,
+    MAIL_SERVER="smtp.gmail.com",
+    MAIL_FROM_NAME="Exam System",
+    MAIL_SSL_TLS=False,
+    MAIL_STARTTLS=True,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True
 )
 
 
 async def send_reset_email(email: EmailStr, token: str):
-    reset_link = f"{os.getenv('FRONTEND_URL')}/reset-password?token={token}"
+    try:
+        reset_link = f"http://localhost:3000/reset-password?token={token}"
 
-    message = MessageSchema(
-        subject="Şifre Sıfırlama",
-        recipients=[email],
-        body=f"""
-        Şifrenizi sıfırlamak için aşağıdaki linke tıklayın:
-        {reset_link}
+        message = MessageSchema(
+            subject="Şifre Sıfırlama",
+            recipients=[email],
+            body=f"""
+            <html>
+                <body>
+                    <h2>Şifre Sıfırlama İsteği</h2>
+                    <p>Şifrenizi sıfırlamak için aşağıdaki linke tıklayın:</p>
+                    <p><a href="{reset_link}">Şifremi Sıfırla</a></p>
+                    <p>Bu link 30 dakika süreyle geçerlidir.</p>
+                </body>
+            </html>
+            """,
+            subtype="html"
+        )
 
-        Bu link 30 dakika süreyle geçerlidir.
-        """,
-        subtype="html"
-    )
-
-    fm = FastMail(conf)
-    await fm.send_message(message)
+        fm = FastMail(email_conf)
+        await fm.send_message(message)
+        return True
+    except Exception as e:
+        print(f"Email sending error: {str(e)}")
+        return False
