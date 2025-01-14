@@ -313,7 +313,7 @@ def start_exam(
         "remaining_minutes": 90
     }
 
-@router.get("/exam-time-status/{exam_id}")
+@router.get("/exam-time/{exam_id}")
 def get_exam_time_status(
     exam_id: int,
     current_user: UserDB = Depends(get_current_user),
