@@ -101,16 +101,19 @@ def submit_exam(
     current_time = datetime.utcnow()
 
     if existing_result.end_time:
-        # end_time'ı UTC'ye çevir ve karşılaştır
-        if isinstance(existing_result.end_time, str):
+        # end_time'ı datetime objesine çevir
+        if isinstance(existing_result.end_time, date):
+            end_time = datetime.combine(existing_result.end_time, datetime.min.time())
+        elif isinstance(existing_result.end_time, str):
             end_time = datetime.fromisoformat(existing_result.end_time.replace('Z', '+00:00'))
         else:
             end_time = existing_result.end_time
 
         # Tarihleri UTC'ye normalize et
         current_time = current_time.replace(tzinfo=pytz.UTC)
-        if end_time.tzinfo is None:
-            end_time = end_time.replace(tzinfo=pytz.UTC)
+        if isinstance(end_time, datetime):
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=pytz.UTC)
 
         if current_time > end_time:
             raise HTTPException(
