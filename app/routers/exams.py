@@ -96,13 +96,15 @@ def submit_exam(
     if not existing_result:
         raise HTTPException(status_code=400, detail="Sınav başlatılmamış")
 
-    # Eğer start_time verilmemişse, ona göre end_time hesapla
+    # Eğer end_time verisi yoksa, onu hesapla
     if not existing_result.end_time:
         existing_result.calculate_end_time()
         db.commit()
 
-    # Sınavın bitiş zamanını kontrol et
+    # End_time'ı doğru bir şekilde kontrol et
     end_time = existing_result.end_time
+
+    # Zaman dilimi farkı göz önünde bulundurularak UTC yerine yerel zaman kullanılabilir.
     if datetime.utcnow() > end_time:
         raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 

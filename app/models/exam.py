@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime,timedelta
+import pytz
 
 class Exam(Base):
     __tablename__ = "exams"
@@ -42,13 +43,15 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
-    start_time = Column(DateTime, default=datetime.utcnow)  # Kullanıcı sınavı başlatınca başlangıç zamanı
-    end_time = Column(DateTime)  # Kullanıcıya özgü bitiş zamanı
+    start_time = Column(DateTime, default=datetime.utcnow)  # UTC zaman
+    end_time = Column(DateTime)  # Kullanıcıya özel bitiş zamanı
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
 
-    # Yeni bir özellik ekleyerek start_time'a göre end_time hesaplayabilirsiniz.
     def calculate_end_time(self):
+        # Kullanıcının zaman dilimine uygun hesaplama yapalım
         if self.start_time:
-            self.end_time = self.start_time + timedelta(minutes=90)  # 90 dakika ekliyoruz
+            # Zaman dilimi bilgisi ekleyebiliriz. Örneğin, UTC zamanını kullanabiliriz.
+            utc_start_time = self.start_time.replace(tzinfo=pytz.utc)  # UTC ile saat diliminde başlat
+            self.end_time = utc_start_time + timedelta(minutes=90)
