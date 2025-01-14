@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import datetime
+from datetime import datetime,timedelta
 
 class Exam(Base):
     __tablename__ = "exams"
@@ -37,13 +37,14 @@ class Question(Base):
 
 class ExamResult(Base):
     __tablename__ = "exam_results"
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     exam_id = Column(Integer, ForeignKey("exams.id"))
-    correct_answers = Column(Integer, default=0)
-    incorrect_answers = Column(Integer, default=0)
-    started_at = Column(DateTime, default=datetime.utcnow)
-    ends_at = Column(DateTime)  # New field to store end time
+    correct_answers = Column(Integer)
+    incorrect_answers = Column(Integer)
+    start_time = Column(DateTime, default=datetime.utcnow)
+    end_time = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=90))
 
     user = relationship("UserDB", back_populates="exam_results")
-    exam = relationship("Exam", back_populates="exam_results")
+    exam = relationship("Exam", back_populates="results")

@@ -91,13 +91,12 @@ def submit_exam(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
     ).first()
-    if existing_result:
-        raise HTTPException(status_code=400, detail="Sınav zaten çözülmüş")
+    if not existing_result:
+        raise HTTPException(status_code=400, detail="Sınav başlatılmamış")
 
-    # Check if the exam exists
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Exam not found")
+    # Check if the exam time has expired
+    if datetime.utcnow() > existing_result.end_time:
+        raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
     # Calculate the total number of questions
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
@@ -120,13 +119,8 @@ def submit_exam(
     score_percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
 
     # Save the exam result
-    exam_result = ExamResult(
-        user_id=current_user.id,
-        exam_id=exam_id,
-        correct_answers=correct_count,
-        incorrect_answers=incorrect_count
-    )
-    db.add(exam_result)
+    existing_result.correct_answers = correct_count
+    existing_result.incorrect_answers = incorrect_count
     db.commit()
 
     return ExamResultResponse(
@@ -135,7 +129,6 @@ def submit_exam(
         total_questions=total_questions,
         score_percentage=score_percentage
     )
-
 
 @router.get("/exam-results/{exam_id}")
 def get_exam_results(
@@ -247,5 +240,31 @@ def get_exam(
         "questions": questions,
         "has_been_taken": bool(existing_result)
     }
+@router.post("/start-exam/{exam_id}")
+def start_exam(
+        exam_id: int,
+        current_user: UserDB = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    # Check if the user has already started the exam
+    existing_result = db.query(ExamResult).filter(
+        ExamResult.user_id == current_user.id,
+        ExamResult.exam_id == exam_id
+    ).first()
+    if existing_result:
+        raise HTTPException(status_code=400, detail="Sınav zaten başlatılmış")
 
+    # Create a new exam result with start and end times
+    start_time = datetime.utcnow()
+    end_time = start_time + timedelta(minutes=90)
+    exam_result = ExamResult(
+        user_id=current_user.id,
+        exam_id=exam_id,
+        start_time=start_time,
+        end_time=end_time
+    )
+    db.add(exam_result)
+    db.commit()
+
+    return {"start_time": start_time, "end_time": end_time}
 
