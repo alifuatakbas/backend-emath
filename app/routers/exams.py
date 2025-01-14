@@ -87,39 +87,31 @@ def submit_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Check if the user has already started the exam
+    # Sınavın başlatılıp başlatılmadığını kontrol et
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
     ).first()
 
     if not existing_result:
-        # Create new exam result with 90 minutes duration
-        existing_result = ExamResult(
-            user_id=current_user.id,
-            exam_id=exam_id,
-            start_time=datetime.utcnow(),
-            end_time=datetime.utcnow() + timedelta(minutes=90)
-        )
-        db.add(existing_result)
-        db.commit()
+        raise HTTPException(status_code=400, detail="Sınav henüz başlatılmamış")
 
-    # Check if the exam time has expired
+    # Süre kontrolü yap
     current_time = datetime.utcnow()
     if current_time > existing_result.end_time:
         raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
-    # Calculate the total number of questions
+    # Toplam soru sayısını hesapla
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
 
-    # Calculate correct and incorrect answers
+    # Doğru ve yanlış cevapları hesapla
     correct_count = 0
     incorrect_count = 0
 
     for question_answer in submission.answers:
         question = db.query(Question).filter(Question.id == question_answer.question_id).first()
         if not question:
-            raise HTTPException(status_code=404, detail=f"Question {question_answer.question_id} not found")
+            raise HTTPException(status_code=404, detail=f"Soru bulunamadı: {question_answer.question_id}")
 
         if question_answer.selected_option_id == question.correct_option_id:
             correct_count += 1
@@ -128,7 +120,7 @@ def submit_exam(
 
     score_percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
 
-    # Update the exam result
+    # Sonuçları kaydet
     existing_result.correct_answers = correct_count
     existing_result.incorrect_answers = incorrect_count
     db.commit()
@@ -251,31 +243,101 @@ def get_exam(
         "questions": questions,
         "has_been_taken": bool(existing_result)
     }
+
+
 @router.post("/start-exam/{exam_id}")
 def start_exam(
         exam_id: int,
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Check if the user has already started the exam
+    # Sınavın var olup olmadığını kontrol et
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+
+    # Kullanıcının bu sınavı daha önce başlatıp başlatmadığını kontrol et
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
     ).first()
-    if existing_result:
-        raise HTTPException(status_code=400, detail="Sınav zaten başlatılmış")
 
-    # Create a new exam result with start and end times
+    if existing_result:
+        # Sınav zaten başlatılmış, süre kontrolü yap
+        current_time = datetime.utcnow()
+        if current_time > existing_result.end_time:
+            # Süre dolmuşsa hata döndür
+            raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+
+        # Süre dolmamışsa kalan süreyi hesapla ve döndür
+        remaining_time = existing_result.end_time - current_time
+        remaining_minutes = int(remaining_time.total_seconds() / 60)
+
+        return {
+            "message": "Sınav devam ediyor",
+            "start_time": existing_result.start_time,
+            "end_time": existing_result.end_time,
+            "remaining_minutes": remaining_minutes
+        }
+
+    # Yeni sınav başlat
     start_time = datetime.utcnow()
     end_time = start_time + timedelta(minutes=90)
-    exam_result = ExamResult(
+
+    new_result = ExamResult(
         user_id=current_user.id,
         exam_id=exam_id,
         start_time=start_time,
-        end_time=end_time
+        end_time=end_time,
+        correct_answers=0,
+        incorrect_answers=0
     )
-    db.add(exam_result)
+
+    db.add(new_result)
     db.commit()
 
-    return {"start_time": start_time, "end_time": end_time}
+    return {
+        "message": "Sınav başlatıldı",
+        "start_time": start_time,
+        "end_time": end_time,
+        "remaining_minutes": 90
+    }
 
+
+@router.get("/exam-time/{exam_id}")
+def get_exam_time(
+        exam_id: int,
+        current_user: UserDB = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    # Kullanıcının sınav durumunu kontrol et
+    exam_result = db.query(ExamResult).filter(
+        ExamResult.user_id == current_user.id,
+        ExamResult.exam_id == exam_id
+    ).first()
+
+    if not exam_result:
+        return {
+            "is_started": False,
+            "remaining_minutes": None,
+            "message": "Sınav henüz başlatılmamış"
+        }
+
+    current_time = datetime.utcnow()
+    if current_time > exam_result.end_time:
+        return {
+            "is_started": True,
+            "remaining_minutes": 0,
+            "message": "Sınav süresi dolmuş"
+        }
+
+    remaining_time = exam_result.end_time - current_time
+    remaining_minutes = int(remaining_time.total_seconds() / 60)
+
+    return {
+        "is_started": True,
+        "remaining_minutes": remaining_minutes,
+        "start_time": exam_result.start_time,
+        "end_time": exam_result.end_time,
+        "message": "Sınav devam ediyor"
+    }

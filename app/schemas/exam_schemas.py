@@ -33,3 +33,5 @@ class ExamSCH(BaseModel):
 
     class Config:
         from_attributes = True
+
+
