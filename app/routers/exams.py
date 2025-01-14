@@ -271,6 +271,14 @@ def start_exam(
         raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
     # Kullanıcının bu sınavı daha önce başlatıp başlatmadığını kontrol et
+    start_time = datetime.utcnow()
+    end_time = start_time + timedelta(minutes=90)
+
+    if not isinstance(start_time, datetime):
+        start_time = datetime.combine(start_time, datetime.min.time())
+    if not isinstance(end_time, datetime):
+        end_time = datetime.combine(end_time, datetime.min.time())
+
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
