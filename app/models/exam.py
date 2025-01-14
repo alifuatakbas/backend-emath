@@ -43,8 +43,9 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
-    start_time = Column(DateTime, nullable=False)
-    end_time = Column(DateTime, nullable=False)
+    # DateTime tipini açıkça belirtelim
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")

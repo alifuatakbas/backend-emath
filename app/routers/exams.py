@@ -202,57 +202,68 @@ def start_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Sınavın var olup olmadığını kontrol et
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+    try:
+        # Sınavın var olup olmadığını kontrol et
+        exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
-    # Kullanıcının bu sınavı daha önce başlatıp başlatmadığını kontrol et
-    existing_result = db.query(ExamResult).filter(
-        ExamResult.user_id == current_user.id,
-        ExamResult.exam_id == exam_id
-    ).first()
+        # Kullanıcının bu sınavı daha önce başlatıp başlatmadığını kontrol et
+        existing_result = db.query(ExamResult).filter(
+            ExamResult.user_id == current_user.id,
+            ExamResult.exam_id == exam_id
+        ).first()
 
-    if existing_result:
-        # Sınav zaten başlatılmış, süre kontrolü yap
-        current_time = datetime.utcnow()
-        remaining_time = existing_result.end_time - current_time
+        if existing_result:
+            # Sınav zaten başlatılmış, süre kontrolü yap
+            current_time = datetime.utcnow()
+            remaining_time = existing_result.end_time - current_time
 
-        if remaining_time.total_seconds() <= 0:
-            raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+            if remaining_time.total_seconds() <= 0:
+                raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
-        # Süre dolmamışsa kalan süreyi hesapla
-        remaining_minutes = int(remaining_time.total_seconds() / 60)
+            # Süre dolmamışsa kalan süreyi hesapla
+            remaining_minutes = int(remaining_time.total_seconds() / 60)
+
+            return {
+                "message": "Sınav devam ediyor",
+                "start_time": existing_result.start_time.isoformat(),
+                "end_time": existing_result.end_time.isoformat(),
+                "remaining_minutes": remaining_minutes
+            }
+
+        # Yeni sınav başlat
+        start_time = datetime.utcnow()
+        end_time = start_time + timedelta(minutes=90)
+
+        # Timezone'ları açıkça belirt
+        start_time = start_time.replace(tzinfo=pytz.UTC)
+        end_time = end_time.replace(tzinfo=pytz.UTC)
+
+        new_result = ExamResult(
+            user_id=current_user.id,
+            exam_id=exam_id,
+            start_time=start_time,
+            end_time=end_time,
+            correct_answers=0,
+            incorrect_answers=0
+        )
+
+        db.add(new_result)
+        db.commit()
+        db.refresh(new_result)
 
         return {
-            "message": "Sınav devam ediyor",
-            "start_time": existing_result.start_time.isoformat(),
-            "end_time": existing_result.end_time.isoformat(),
-            "remaining_minutes": remaining_minutes
+            "message": "Sınav başlatıldı",
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
+            "remaining_minutes": 90
         }
 
-    # Yeni sınav başlat
-    start_time = datetime.utcnow()
-    end_time = start_time + timedelta(minutes=90)  # 90 dakikalık süre
-
-    new_result = ExamResult(
-        user_id=current_user.id,
-        exam_id=exam_id,
-        start_time=start_time,
-        end_time=end_time,
-        correct_answers=0,
-        incorrect_answers=0
-    )
-
-    db.add(new_result)
-    db.commit()
-
-    return {
-        "message": "Sınav başlatıldı",
-        "start_time": start_time.isoformat(),
-        "end_time": end_time.isoformat(),
-        "remaining_minutes": 90
-    }
+    except Exception as e:
+        print(f"Start exam error: {str(e)}")  # Hata ayıklama için
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Sınav başlatılırken bir hata oluştu: {str(e)}")
 
 @router.get("/exam-time/{exam_id}")
 def get_exam_time_status(
