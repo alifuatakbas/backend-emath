@@ -100,28 +100,17 @@ def submit_exam(
     # Süre kontrolü
     current_time = datetime.utcnow()
 
-    if existing_result.end_time:
-        # end_time'ı datetime objesine çevir
-        if isinstance(existing_result.end_time, date):
-            end_time = datetime.combine(existing_result.end_time, datetime.min.time())
-        elif isinstance(existing_result.end_time, str):
-            end_time = datetime.fromisoformat(existing_result.end_time.replace('Z', '+00:00'))
-        else:
-            end_time = existing_result.end_time
-
-        # Tarihleri UTC'ye normalize et
-        current_time = current_time.replace(tzinfo=pytz.UTC)
-        if isinstance(end_time, datetime):
-            if end_time.tzinfo is None:
-                end_time = end_time.replace(tzinfo=pytz.UTC)
-
-        if current_time > end_time:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Sınav süresi dolmuş. Bitiş zamanı: {end_time}, Şu anki zaman: {current_time}"
-            )
+    if isinstance(existing_result.end_time, datetime):
+        end_time = existing_result.end_time
     else:
-        raise HTTPException(status_code=500, detail="Sınavın bitiş zamanı belirlenmemiş")
+        # end_time string ise datetime'a çevir
+        end_time = datetime.fromisoformat(str(existing_result.end_time).replace('Z', '+00:00'))
+
+    if current_time > end_time:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Sınav süresi dolmuş. Kalan süreniz: 0 dakika"
+        )
 
     # Toplam soru sayısını hesapla
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
@@ -153,7 +142,6 @@ def submit_exam(
         total_questions=total_questions,
         score_percentage=score_percentage
     )
-
 
 @router.get("/exam-results/{exam_id}")
 def get_exam_results(
@@ -279,14 +267,6 @@ def start_exam(
         raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
     # Kullanıcının bu sınavı daha önce başlatıp başlatmadığını kontrol et
-    start_time = datetime.utcnow()
-    end_time = start_time + timedelta(minutes=90)
-
-    if not isinstance(start_time, datetime):
-        start_time = datetime.combine(start_time, datetime.min.time())
-    if not isinstance(end_time, datetime):
-        end_time = datetime.combine(end_time, datetime.min.time())
-
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
@@ -295,24 +275,24 @@ def start_exam(
     if existing_result:
         # Sınav zaten başlatılmış, süre kontrolü yap
         current_time = datetime.utcnow()
-        if current_time > existing_result.end_time:
-            # Süre dolmuşsa hata döndür
+        remaining_time = existing_result.end_time - current_time
+
+        if remaining_time.total_seconds() <= 0:
             raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
-        # Süre dolmamışsa kalan süreyi hesapla ve döndür
-        remaining_time = existing_result.end_time - current_time
+        # Süre dolmamışsa kalan süreyi hesapla
         remaining_minutes = int(remaining_time.total_seconds() / 60)
 
         return {
             "message": "Sınav devam ediyor",
-            "start_time": existing_result.start_time,
-            "end_time": existing_result.end_time,
+            "start_time": existing_result.start_time.isoformat(),
+            "end_time": existing_result.end_time.isoformat(),
             "remaining_minutes": remaining_minutes
         }
 
     # Yeni sınav başlat
     start_time = datetime.utcnow()
-    end_time = start_time + timedelta(minutes=90)
+    end_time = start_time + timedelta(minutes=90)  # 90 dakikalık süre
 
     new_result = ExamResult(
         user_id=current_user.id,
@@ -328,19 +308,17 @@ def start_exam(
 
     return {
         "message": "Sınav başlatıldı",
-        "start_time": start_time,
-        "end_time": end_time,
+        "start_time": start_time.isoformat(),
+        "end_time": end_time.isoformat(),
         "remaining_minutes": 90
     }
 
-
-@router.get("/exam-time/{exam_id}")
-def get_exam_time(
-        exam_id: int,
-        current_user: UserDB = Depends(get_current_user),
-        db: Session = Depends(get_db)
+@router.get("/exam-time-status/{exam_id}")
+def get_exam_time_status(
+    exam_id: int,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    # Kullanıcının sınav durumunu kontrol et
     exam_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
@@ -354,16 +332,7 @@ def get_exam_time(
         }
 
     current_time = datetime.utcnow()
-
-    # end_time kontrolü ve dönüşümü
-    if exam_result.end_time and isinstance(exam_result.end_time, datetime):
-        end_time = exam_result.end_time
-    else:
-        try:
-            end_time = datetime.combine(exam_result.end_time, datetime.min.time())
-        except Exception as e:
-            print(f"Time conversion error: {e}")
-            raise HTTPException(status_code=500, detail="Zaman hesaplamasında bir hata oluştu")
+    end_time = exam_result.end_time
 
     if current_time > end_time:
         return {
@@ -378,7 +347,7 @@ def get_exam_time(
     return {
         "is_started": True,
         "remaining_minutes": remaining_minutes,
-        "start_time": exam_result.start_time,
-        "end_time": end_time,
+        "start_time": exam_result.start_time.isoformat(),
+        "end_time": exam_result.end_time.isoformat(),
         "message": "Sınav devam ediyor"
     }
