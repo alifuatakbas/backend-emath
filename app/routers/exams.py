@@ -98,8 +98,22 @@ def submit_exam(
 
     # Süre kontrolü yap
     current_time = datetime.utcnow()
-    if current_time > existing_result.end_time:
-        raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+    if existing_result.end_time and isinstance(existing_result.end_time, datetime):
+        if current_time > existing_result.end_time:
+            raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+    else:
+        # end_time'ı datetime'a çevir
+        try:
+            end_time = datetime.combine(existing_result.end_time, datetime.min.time())
+            if current_time > end_time:
+                raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+        except Exception as e:
+            print(f"Time comparison error: {e}")
+            # Log the actual types for debugging
+            print(f"current_time type: {type(current_time)}")
+            print(f"end_time type: {type(existing_result.end_time)}")
+            print(f"end_time value: {existing_result.end_time}")
+            raise HTTPException(status_code=500, detail="Sınav süresi kontrolünde bir hata oluştu")
 
     # Toplam soru sayısını hesapla
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
@@ -324,20 +338,31 @@ def get_exam_time(
         }
 
     current_time = datetime.utcnow()
-    if current_time > exam_result.end_time:
+
+    # end_time kontrolü ve dönüşümü
+    if exam_result.end_time and isinstance(exam_result.end_time, datetime):
+        end_time = exam_result.end_time
+    else:
+        try:
+            end_time = datetime.combine(exam_result.end_time, datetime.min.time())
+        except Exception as e:
+            print(f"Time conversion error: {e}")
+            raise HTTPException(status_code=500, detail="Zaman hesaplamasında bir hata oluştu")
+
+    if current_time > end_time:
         return {
             "is_started": True,
             "remaining_minutes": 0,
             "message": "Sınav süresi dolmuş"
         }
 
-    remaining_time = exam_result.end_time - current_time
+    remaining_time = end_time - current_time
     remaining_minutes = int(remaining_time.total_seconds() / 60)
 
     return {
         "is_started": True,
         "remaining_minutes": remaining_minutes,
         "start_time": exam_result.start_time,
-        "end_time": exam_result.end_time,
+        "end_time": end_time,
         "message": "Sınav devam ediyor"
     }
