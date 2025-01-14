@@ -86,27 +86,30 @@ def submit_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Check if the user has already submitted the exam
+    # Kullanıcı sınav sonucunu sorgula
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
     ).first()
+
+    # Eğer kullanıcı daha önce sınavı başlatmamışsa
     if not existing_result:
         raise HTTPException(status_code=400, detail="Sınav başlatılmamış")
 
-    # Ensure end_time is a datetime object
-    end_time = existing_result.end_time
-    if isinstance(end_time, date) and not isinstance(end_time, datetime):
-        end_time = datetime.combine(end_time, datetime.min.time())
+    # Eğer start_time verilmemişse, ona göre end_time hesapla
+    if not existing_result.end_time:
+        existing_result.calculate_end_time()
+        db.commit()
 
-    # Check if the exam time has expired
+    # Sınavın bitiş zamanını kontrol et
+    end_time = existing_result.end_time
     if datetime.utcnow() > end_time:
         raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
-    # Calculate the total number of questions
+    # Sınav sorularını say
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
 
-    # Calculate correct and incorrect answers
+    # Doğru ve yanlış cevap sayısını hesapla
     correct_count = 0
     incorrect_count = 0
 
@@ -121,9 +124,10 @@ def submit_exam(
         else:
             incorrect_count += 1
 
+    # Yüzdeyi hesapla
     score_percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
 
-    # Save the exam result
+    # Sınav sonucunu kaydet
     existing_result.correct_answers = correct_count
     existing_result.incorrect_answers = incorrect_count
     db.commit()
@@ -134,6 +138,7 @@ def submit_exam(
         total_questions=total_questions,
         score_percentage=score_percentage
     )
+
 
 @router.get("/exam-results/{exam_id}")
 def get_exam_results(

@@ -42,8 +42,13 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
-    start_time = Column(DateTime, default=datetime.utcnow)
-    end_time = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=90))
+    start_time = Column(DateTime, default=datetime.utcnow)  # Kullanıcı sınavı başlatınca başlangıç zamanı
+    end_time = Column(DateTime)  # Kullanıcıya özgü bitiş zamanı
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
+
+    # Yeni bir özellik ekleyerek start_time'a göre end_time hesaplayabilirsiniz.
+    def calculate_end_time(self):
+        if self.start_time:
+            self.end_time = self.start_time + timedelta(minutes=90)  # 90 dakika ekliyoruz
