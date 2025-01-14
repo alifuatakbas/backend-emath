@@ -58,10 +58,6 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 
 
 
-
-router = APIRouter()
-
-
 # Şifremi unuttum endpoint'i
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
