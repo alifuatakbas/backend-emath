@@ -5,7 +5,7 @@ from database import get_db
 from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,date
 router = APIRouter()
 User = UserDB
 
@@ -96,7 +96,7 @@ def submit_exam(
 
     # Ensure end_time is a datetime object
     end_time = existing_result.end_time
-    if isinstance(end_time, datetime.date) and not isinstance(end_time, datetime.datetime):
+    if isinstance(end_time, date) and not isinstance(end_time, datetime):
         end_time = datetime.combine(end_time, datetime.min.time())
 
     # Check if the exam time has expired
