@@ -79,6 +79,7 @@ def check_submission_status(exam_id: int, current_user: UserDB = Depends(get_cur
     has_submitted = exam_result is not None
     return {"hasSubmitted": has_submitted}
 
+
 @router.post("/submit-exam/{exam_id}", response_model=ExamResultResponse)
 def submit_exam(
         exam_id: int,
@@ -86,32 +87,32 @@ def submit_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Kullanıcı sınav sonucunu sorgula
+    # Check if the user has already started the exam
     existing_result = db.query(ExamResult).filter(
         ExamResult.user_id == current_user.id,
         ExamResult.exam_id == exam_id
     ).first()
 
-    # Eğer kullanıcı daha önce sınavı başlatmamışsa
     if not existing_result:
-        raise HTTPException(status_code=400, detail="Sınav başlatılmamış")
-
-    # Eğer end_time verisi yoksa, onu hesapla
-    if not existing_result.end_time:
-        existing_result.calculate_end_time()
+        # Create new exam result with 90 minutes duration
+        existing_result = ExamResult(
+            user_id=current_user.id,
+            exam_id=exam_id,
+            start_time=datetime.utcnow(),
+            end_time=datetime.utcnow() + timedelta(minutes=90)
+        )
+        db.add(existing_result)
         db.commit()
 
-    # End_time'ı doğru bir şekilde kontrol et
-    end_time = existing_result.end_time
-
-    # Zaman dilimi farkı göz önünde bulundurularak UTC yerine yerel zaman kullanılabilir.
-    if datetime.utcnow() > end_time:
+    # Check if the exam time has expired
+    current_time = datetime.utcnow()
+    if current_time > existing_result.end_time:
         raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
-    # Sınav sorularını say
+    # Calculate the total number of questions
     total_questions = db.query(Question).filter(Question.exam_id == exam_id).count()
 
-    # Doğru ve yanlış cevap sayısını hesapla
+    # Calculate correct and incorrect answers
     correct_count = 0
     incorrect_count = 0
 
@@ -120,16 +121,14 @@ def submit_exam(
         if not question:
             raise HTTPException(status_code=404, detail=f"Question {question_answer.question_id} not found")
 
-        correct_option_index = question.correct_option_id
-        if question_answer.selected_option_id == correct_option_index:
+        if question_answer.selected_option_id == question.correct_option_id:
             correct_count += 1
         else:
             incorrect_count += 1
 
-    # Yüzdeyi hesapla
     score_percentage = (correct_count / total_questions) * 100 if total_questions > 0 else 0
 
-    # Sınav sonucunu kaydet
+    # Update the exam result
     existing_result.correct_answers = correct_count
     existing_result.incorrect_answers = incorrect_count
     db.commit()

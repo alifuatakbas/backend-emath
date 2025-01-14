@@ -43,15 +43,8 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
-    start_time = Column(DateTime, default=datetime.utcnow)  # UTC zaman
-    end_time = Column(DateTime)  # Kullanıcıya özel bitiş zamanı
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
 
     user = relationship("UserDB", back_populates="exam_results")
     exam = relationship("Exam", back_populates="exam_results")
-
-    def calculate_end_time(self):
-        # Kullanıcının zaman dilimine uygun hesaplama yapalım
-        if self.start_time:
-            # Zaman dilimi bilgisi ekleyebiliriz. Örneğin, UTC zamanını kullanabiliriz.
-            utc_start_time = self.start_time.replace(tzinfo=pytz.utc)  # UTC ile saat diliminde başlat
-            self.end_time = utc_start_time + timedelta(minutes=90)
