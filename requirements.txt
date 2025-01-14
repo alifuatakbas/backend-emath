@@ -4,10 +4,10 @@ fastapi~=0.115.6
 sqlmodel~=0.0.22
 pydantic~=2.10.3
 PyJWT~=2.10.1
-SQLAlchemy~=2.0.36
 pydantic-settings>=2.0.0
 python-multipart>=0.0.5
 python-dotenv==1.0.0
 uvicorn~=0.32.1
-mysql-connector-python~=8.0.27
+SQLAlchemy==2.0.36
+mysql-connector-python==8.2.0
 pytz~=2021.3
