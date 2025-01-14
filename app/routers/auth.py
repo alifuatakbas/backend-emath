@@ -16,9 +16,12 @@ from app.services.email import send_reset_email
 from jose import jwt
 from datetime import datetime, timedelta
 import os
+from dotenv import load_dotenv
+SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+
 
 router = APIRouter()
-
+load_dotenv()
 
 @router.post("/register", response_model=User)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -73,7 +76,8 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
         "sub": user.email,
         "exp": datetime.utcnow() + timedelta(minutes=30)
     }
-    reset_token = jwt.encode(token_data, os.getenv("SECRET_KEY"), algorithm="HS256")
+    # os.getenv yerine doğrudan SECRET_KEY kullan
+    reset_token = jwt.encode(token_data, SECRET_KEY, algorithm="HS256")
 
     # Email gönder
     await send_reset_email(user.email, reset_token)
@@ -81,12 +85,11 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
     return {"message": "Şifre sıfırlama linki email adresinize gönderildi"}
 
 
-# Şifre sıfırlama endpoint'i
 @router.post("/reset-password")
 async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     try:
-        # Token'ı doğrula
-        payload = jwt.decode(request.token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        # Token'ı doğrula (burada da SECRET_KEY'i doğrudan kullan)
+        payload = jwt.decode(request.token, SECRET_KEY, algorithms=["HS256"])
         email = payload.get("sub")
 
         user = db.query(UserDB).filter(UserDB.email == email).first()
