@@ -17,11 +17,6 @@ print(f"Looking for .env at: {env_path}")
 load_dotenv(dotenv_path=env_path)
 
 # Debug için environment değişkenlerini kontrol et
-print("Mail Settings Debug:")
-print(f"MAIL_USERNAME: {os.getenv('MAIL_USERNAME')}")
-print(f"MAIL_SERVER: {os.getenv('MAIL_SERVER')}")
-print(f"MAIL_PORT: {os.getenv('MAIL_PORT')}")
-
 # Doğrudan değerleri kullan
 email_conf = ConnectionConfig(
     MAIL_USERNAME="akbasalifuat@gmail.com",  # Doğrudan değer
@@ -36,10 +31,13 @@ email_conf = ConnectionConfig(
     VALIDATE_CERTS=True
 )
 
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://e-math-frontend.vercel.app')
+
 
 async def send_reset_email(email: EmailStr, token: str):
     try:
-        reset_link = f"http://localhost:3000/reset-password?token={token}"
+        # Reset linkini deploy edilmiş adrese yönlendir
+        reset_link = f"{FRONTEND_URL}/reset-password?token={token}"
 
         message = MessageSchema(
             subject="Şifre Sıfırlama",
