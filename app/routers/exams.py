@@ -215,23 +215,30 @@ def start_exam(
         ).first()
 
         if existing_result:
+            # Sınav zaten başlatılmış, süre kontrolü yap
             current_time = datetime.utcnow()
             remaining_time = existing_result.end_time - current_time
+
+            if remaining_time.total_seconds() <= 0:
+                raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+
+            # Süre dolmamışsa kalan süreyi hesapla
             remaining_minutes = int(remaining_time.total_seconds() / 60)
 
             return {
                 "message": "Sınav devam ediyor",
-                "start_time": existing_result.start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "end_time": existing_result.end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "start_time": existing_result.start_time.isoformat(),
+                "end_time": existing_result.end_time.isoformat(),
                 "remaining_minutes": remaining_minutes
             }
 
-        # Yeni sınav başlat - datetime formatını açıkça belirtelim
-        start_time = datetime.now(pytz.UTC)
+        # Yeni sınav başlat
+        start_time = datetime.utcnow()
         end_time = start_time + timedelta(minutes=90)
 
-        print(f"Debug - Start Time: {start_time}")  # Debug için
-        print(f"Debug - End Time: {end_time}")      # Debug için
+        # Timezone'ları açıkça belirt
+        start_time = start_time.replace(tzinfo=pytz.UTC)
+        end_time = end_time.replace(tzinfo=pytz.UTC)
 
         new_result = ExamResult(
             user_id=current_user.id,
@@ -246,20 +253,17 @@ def start_exam(
         db.commit()
         db.refresh(new_result)
 
-        print(f"Debug - Saved Start Time: {new_result.start_time}")  # Debug için
-        print(f"Debug - Saved End Time: {new_result.end_time}")      # Debug için
-
         return {
             "message": "Sınav başlatıldı",
-            "start_time": start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "end_time": end_time.strftime("%Y-%m-%d %H:%M:%S"),
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
             "remaining_minutes": 90
         }
 
     except Exception as e:
-        print(f"Start exam error: {str(e)}")
+        print(f"Start exam error: {str(e)}")  # Hata ayıklama için
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Sınav başlatılırken bir hata oluştu: {str(e)}")
 
 @router.get("/exam-time/{exam_id}")
 def get_exam_time_status(
@@ -299,3 +303,74 @@ def get_exam_time_status(
         "end_time": exam_result.end_time.isoformat(),
         "message": "Sınav devam ediyor"
     }
+
+
+@router.post("/submit-exam/{exam_id}", response_model=ExamResultResponse)
+def submit_exam(
+        exam_id: int,
+        submission: ExamSubmission,
+        current_user: UserDB = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    try:
+        # Sınavın başlatılıp başlatılmadığını kontrol et
+        existing_result = db.query(ExamResult).filter(
+            ExamResult.user_id == current_user.id,
+            ExamResult.exam_id == exam_id
+        ).first()
+
+        if not existing_result:
+            raise HTTPException(status_code=400, detail="Sınav henüz başlatılmamış")
+
+        # Debug için yazdırma
+        print(f"Submission answers: {submission.answers}")
+
+        # Doğru ve yanlış cevapları hesapla
+        correct_count = 0
+        incorrect_count = 0
+
+        # Önce sınavın tüm sorularını al
+        exam_questions = db.query(Question).filter(Question.exam_id == exam_id).all()
+        questions_dict = {q.id: q for q in exam_questions}
+
+        print(f"Available questions: {[q.id for q in exam_questions]}")  # Debug için
+
+        for answer in submission.answers:
+            print(f"Processing answer for question {answer.question_id}")  # Debug için
+
+            question = questions_dict.get(answer.question_id)
+            if question:
+                if answer.selected_option_id == question.correct_option_id:
+                    correct_count += 1
+                else:
+                    incorrect_count += 1
+            else:
+                print(f"Question not found: {answer.question_id}")  # Debug için
+
+        total_questions = len(exam_questions)
+        if total_questions == 0:
+            raise HTTPException(status_code=400, detail="Bu sınavda soru bulunmamaktadır")
+
+        score_percentage = (correct_count / total_questions) * 100
+
+        # Sonuçları kaydet
+        existing_result.correct_answers = correct_count
+        existing_result.incorrect_answers = incorrect_count
+        db.commit()
+
+        print(f"Final results - Correct: {correct_count}, Incorrect: {incorrect_count}")  # Debug için
+
+        return ExamResultResponse(
+            correct_answers=correct_count,
+            incorrect_answers=incorrect_count,
+            total_questions=total_questions,
+            score_percentage=score_percentage
+        )
+
+    except Exception as e:
+        print(f"Error in submit_exam: {str(e)}")  # Debug için
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sınav gönderilirken bir hata oluştu: {str(e)}"
+        )
