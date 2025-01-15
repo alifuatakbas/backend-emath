@@ -24,16 +24,15 @@ def create_exam(request: ExamCreateRequest | None
 
 
 @router.post("/add-question/{exam_id}")
-async def add_question(
-        exam_id: int,
-        text: str = Form(...),
-        options: str = Form(...),  # virgülle ayrılmış string olarak al
-        correct_option_index: int = Form(...),
-        db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user)
-):
+def add_question(exam_id: int,
+                 text: str,
+                 options: str,  # string olarak alıyoruz
+                 correct_option_index: int,
+                 db: Session = Depends(get_db),
+                 current_user: UserDB = Depends(get_current_user)
+                 ):
     # String'i listeye çevir
-    options_list = options.split(',')
+    options_list = options.split('|')  # | karakterine göre böl
 
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
