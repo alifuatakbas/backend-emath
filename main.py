@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from app.routers import auth, exams
+from app.routers import auth, exams,admin_exams
 from database import engine, Base
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,6 +11,8 @@ except Exception as e:
 app = FastAPI()
 app.include_router(auth.router)
 app.include_router(exams.router)
+
+app.include_router(admin_exams.router)
 
 # CORS ayarları
 app.add_middleware(
