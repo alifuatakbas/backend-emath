@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamCreateRequest
+from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
@@ -100,3 +100,43 @@ def get_exam_results(
         "correct_answers": exam_result.correct_answers,
         "incorrect_answers": exam_result.incorrect_answers
     }
+
+
+@router.post("/exams/{exam_id}/publish/{publish}", response_model=ExamSCH)
+async def publish_exam(
+    exam_id: int,
+    publish: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Yetkiniz yok")
+
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+
+    if publish not in [0, 1]:
+        raise HTTPException(status_code=400, detail="Publish parameter must be 0 or 1")
+
+    exam.is_published = bool(publish)
+    db.commit()
+    db.refresh(exam)
+
+    # Prepare questions with options
+    questions_with_options = []
+    for question in exam.questions:
+        options = [question.option_1, question.option_2, question.option_3, question.option_4, question.option_5]
+        questions_with_options.append(QuestionSCH(
+            id=question.id,
+            text=question.text,
+            options=options
+        ))
+
+    return ExamSCH(
+        id=exam.id,
+        title=exam.title,
+        is_published=exam.is_published,
+        questions=questions_with_options
+    )
+

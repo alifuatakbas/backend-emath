@@ -25,44 +25,6 @@ def get_exams(current_user: UserDB = Depends(get_current_user), db: Session = De
     return exams
 
 
-@router.post("/exams/{exam_id}/publish/{publish}", response_model=ExamSCH)
-async def publish_exam(
-    exam_id: int,
-    publish: int,
-    db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
-):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Yetkiniz yok")
-
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
-
-    if publish not in [0, 1]:
-        raise HTTPException(status_code=400, detail="Publish parameter must be 0 or 1")
-
-    exam.is_published = bool(publish)
-    db.commit()
-    db.refresh(exam)
-
-    # Prepare questions with options
-    questions_with_options = []
-    for question in exam.questions:
-        options = [question.option_1, question.option_2, question.option_3, question.option_4, question.option_5]
-        questions_with_options.append(QuestionSCH(
-            id=question.id,
-            text=question.text,
-            options=options
-        ))
-
-    return ExamSCH(
-        id=exam.id,
-        title=exam.title,
-        is_published=exam.is_published,
-        questions=questions_with_options
-    )
-
 
 @router.get("/exams/{exam_id}")
 def get_exam(
