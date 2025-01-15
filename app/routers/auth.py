@@ -55,9 +55,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@router.get("/users/me", response_model=User)
-async def read_users_me(current_user: User = Depends(get_current_user)):
-    return current_user
+@router.get("/users/me", response_model=None)  # response_model'i kaldırıyoruz
+async def read_users_me(current_user: UserDB = Depends(get_current_user)):  # User yerine UserDB kullanıyoruz
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "role": current_user.role
+    }
 
 
 
