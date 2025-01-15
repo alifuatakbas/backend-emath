@@ -26,6 +26,7 @@ def get_exams(current_user: UserDB = Depends(get_current_user), db: Session = De
 
 
 
+
 @router.get("/exams/{exam_id}")
 def get_exam(
         exam_id: int,

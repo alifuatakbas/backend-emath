@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH,QuestionCreate
+from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
 
 
+# Normal router yerine admin prefix'li router kullanalım
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 @router.post("/create-exam")
@@ -23,16 +24,21 @@ def create_exam(request: ExamCreateRequest | None
 
 
 @router.post("/add-question/{exam_id}")
-def add_question(
-    exam_id: int,
-    question: QuestionCreate,
-    db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+async def add_question(
+        exam_id: int,
+        text: str = Form(...),
+        options: str = Form(...),  # virgülle ayrılmış string olarak al
+        correct_option_index: int = Form(...),
+        db: Session = Depends(get_db),
+        current_user: UserDB = Depends(get_current_user)
 ):
+    # String'i listeye çevir
+    options_list = options.split(',')
+
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
-    if len(question.options) != 5:
+    if len(options_list) != 5:
         raise HTTPException(status_code=400, detail="Her soru için 5 seçenek gereklidir")
 
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
@@ -42,22 +48,19 @@ def add_question(
     question_number = exam.question_counter + 1
     exam.question_counter = question_number
 
-    new_question = Question(
-        exam_id=exam_id,
-        text=question.text,
-        option_1=question.options[0],
-        option_2=question.options[1],
-        option_3=question.options[2],
-        option_4=question.options[3],
-        option_5=question.options[4],
-        correct_option_id=question.correct_option_index,
-        question_id=question_number
-    )
+    question = Question(exam_id=exam_id, text=text)
+    question.option_1 = options_list[0]
+    question.option_2 = options_list[1]
+    question.option_3 = options_list[2]
+    question.option_4 = options_list[3]
+    question.option_5 = options_list[4]
+    question.correct_option_id = correct_option_index
+    question.question_id = question_number
 
-    db.add(new_question)
+    db.add(question)
     db.commit()
 
-    return {"message": "Soru ve seçenekler eklendi", "question_id": new_question.question_id}
+    return {"message": "Soru ve seçenekler eklendi", "question_id": question.question_id}
 
 
 
@@ -91,7 +94,6 @@ def get_exam_results(
         "correct_answers": exam_result.correct_answers,
         "incorrect_answers": exam_result.incorrect_answers
     }
-
 
 @router.post("/exams/{exam_id}/publish/{publish}", response_model=ExamSCH)
 async def publish_exam(
@@ -130,4 +132,3 @@ async def publish_exam(
         is_published=exam.is_published,
         questions=questions_with_options
     )
-

@@ -35,7 +35,3 @@ class ExamSCH(BaseModel):
         from_attributes = True
 
 
-class QuestionCreate(BaseModel):
-    text: str
-    options: list[str]
-    correct_option_index: int
