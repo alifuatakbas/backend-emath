@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH
+from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH,QuestionCreate
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
@@ -23,50 +23,41 @@ def create_exam(request: ExamCreateRequest | None
 
 
 @router.post("/add-question/{exam_id}")
-def add_question(exam_id: int,
-                 text: str,
-                 options: list[str],
-                 correct_option_index: int,
-                 db: Session = Depends(get_db),
-                 current_user: UserDB = Depends(get_current_user)
-                 ):
+def add_question(
+    exam_id: int,
+    question: QuestionCreate,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
-    # Soru oluşturuluyor, sadece metin alınıyor
-    if len(options) != 5:
+    if len(question.options) != 5:
         raise HTTPException(status_code=400, detail="Her soru için 5 seçenek gereklidir")
 
-    # Exam modelinden sınavı alıyoruz
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
-    # Exam'a ait question_counter'ı artırıyoruz
     question_number = exam.question_counter + 1
-    exam.question_counter = question_number  # question_counter'ı güncelle
+    exam.question_counter = question_number
 
-    # Yeni soruyu ekliyoruz
-    question = Question(exam_id=exam_id, text=text)
-    question.option_1 = options[0]
-    question.option_2 = options[1]
-    question.option_3 = options[2]
-    question.option_4 = options[3]
-    question.option_5 = options[4]
+    new_question = Question(
+        exam_id=exam_id,
+        text=question.text,
+        option_1=question.options[0],
+        option_2=question.options[1],
+        option_3=question.options[2],
+        option_4=question.options[3],
+        option_5=question.options[4],
+        correct_option_id=question.correct_option_index,
+        question_id=question_number
+    )
 
-    # Doğru cevabın index'ine göre correct_option_id'yi belirliyoruz
-    question.correct_option_id = correct_option_index
-
-    # Question ID'yi, her sınav için sıralı şekilde belirlemek
-    question.question_id = question_number  # question_id her sınav için sıralı olacak
-
-    db.add(question)
+    db.add(new_question)
     db.commit()
 
-    # question_counter'ı veritabanına kaydediyoruz
-    db.commit()
-
-    return {"message": "Soru ve seçenekler eklendi", "question_id": question.question_id}
+    return {"message": "Soru ve seçenekler eklendi", "question_id": new_question.question_id}
 
 
 
