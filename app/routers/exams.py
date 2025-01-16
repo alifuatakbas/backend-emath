@@ -19,8 +19,18 @@ def get_exams(current_user: UserDB = Depends(get_current_user), db: Session = De
         # Admin kullanıcı tüm sınavları görebilir
         exams = db.query(Exam).all()
     else:
-        # Normal kullanıcı yalnızca yayınlanmış sınavları görebilir
-        exams = db.query(Exam).filter(Exam.is_published == True).all()
+        # Normal kullanıcı için:
+        # 1. Yalnızca yayınlanmış sınavları al
+        # 2. Kullanıcının çözmediği sınavları filtrele
+        taken_exam_ids = db.query(ExamResult.exam_id).filter(
+            ExamResult.user_id == current_user.id
+        ).all()
+        taken_exam_ids = [exam_id for (exam_id,) in taken_exam_ids]
+
+        exams = db.query(Exam).filter(
+            Exam.is_published == True,
+            ~Exam.id.in_(taken_exam_ids)  # Çözülmemiş sınavları filtrele
+        ).all()
 
     return exams
 
