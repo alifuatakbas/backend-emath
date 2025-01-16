@@ -37,7 +37,7 @@ class QuestionCreate(BaseModel):
 @router.post("/add-question/{exam_id}")
 def add_question(
     exam_id: int,
-    question: QuestionCreate,  # JSON verisi otomatik olarak bu modele dönüşecek
+    question: QuestionCreate,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
@@ -55,6 +55,7 @@ def add_question(
     exam.question_counter = question_number
 
     new_question = Question(
+        id=question_number,  # id'yi question_number olarak ayarla
         exam_id=exam_id,
         text=question.text,
         option_1=question.options[0],
@@ -62,14 +63,14 @@ def add_question(
         option_3=question.options[2],
         option_4=question.options[3],
         option_5=question.options[4],
-        correct_option_id=question.correct_option_index,
-        question_id=question_number
+        correct_option_id=question.correct_option_index
     )
 
     db.add(new_question)
     db.commit()
+    db.refresh(new_question)
 
-    return {"message": "Soru ve seçenekler eklendi", "question_id": new_question.question_id}
+    return {"message": "Soru ve seçenekler eklendi", "question_id": new_question.id}
 
 
 @router.get("/exams/{exam_id}/submission-status")
