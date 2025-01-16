@@ -23,21 +23,28 @@ def create_exam(request: ExamCreateRequest | None
     return {"message": "Sınav oluşturuldu", "exam_id": exam.id}
 
 
-@router.post("/add-question/{exam_id}")
-def add_question(exam_id: int,
-                 text: str,
-                 options: str,  # string olarak alıyoruz
-                 correct_option_index: int,
-                 db: Session = Depends(get_db),
-                 current_user: UserDB = Depends(get_current_user)
-                 ):
-    # String'i listeye çevir
-    options_list = options.split('|')  # | karakterine göre böl
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+from pydantic import BaseModel
 
+# Request modeli
+class QuestionCreate(BaseModel):
+    text: str
+    options: List[str]
+    correct_option_index: int
+
+@router.post("/add-question/{exam_id}")
+def add_question(
+    exam_id: int,
+    question: QuestionCreate,  # JSON verisi otomatik olarak bu modele dönüşecek
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
-    if len(options_list) != 5:
+    if len(question.options) != 5:
         raise HTTPException(status_code=400, detail="Her soru için 5 seçenek gereklidir")
 
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
@@ -47,20 +54,22 @@ def add_question(exam_id: int,
     question_number = exam.question_counter + 1
     exam.question_counter = question_number
 
-    question = Question(exam_id=exam_id, text=text)
-    question.option_1 = options_list[0]
-    question.option_2 = options_list[1]
-    question.option_3 = options_list[2]
-    question.option_4 = options_list[3]
-    question.option_5 = options_list[4]
-    question.correct_option_id = correct_option_index
-    question.question_id = question_number
+    new_question = Question(
+        exam_id=exam_id,
+        text=question.text,
+        option_1=question.options[0],
+        option_2=question.options[1],
+        option_3=question.options[2],
+        option_4=question.options[3],
+        option_5=question.options[4],
+        correct_option_id=question.correct_option_index,
+        question_id=question_number
+    )
 
-    db.add(question)
+    db.add(new_question)
     db.commit()
 
-    return {"message": "Soru ve seçenekler eklendi", "question_id": question.question_id}
-
+    return {"message": "Soru ve seçenekler eklendi", "question_id": new_question.question_id}
 
 
 @router.get("/exams/{exam_id}/submission-status")
