@@ -24,6 +24,7 @@ class QuestionSCH(BaseModel):
     id: int
     text: str
     options: List[str]
+    image: str | None = None
 
 class ExamSCH(BaseModel):
     id: int

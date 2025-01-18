@@ -53,7 +53,7 @@ def get_exam(
         ExamResult.exam_id == exam_id
     ).first()
 
-    # Soruların options'larını da içerecek şekilde veriyi döndürüyoruz
+    # Soruların options'larını ve image'larını da içerecek şekilde veriyi döndürüyoruz
     questions = []
     for question in exam.questions:
         options = [
@@ -66,7 +66,8 @@ def get_exam(
         questions.append({
             "id": question.id,
             "text": question.text,
-            "options": options,  # options burada bir liste olarak döndürülüyor
+            "options": options,
+            "image": question.image,  # image alanını ekledik
             "correct_option_id": question.correct_option_id
         })
 
@@ -76,7 +77,6 @@ def get_exam(
         "questions": questions,
         "has_been_taken": bool(existing_result)
     }
-
 
 @router.post("/start-exam/{exam_id}")
 def start_exam(
