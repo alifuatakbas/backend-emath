@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException,Formgi
+from fastapi import APIRouter, Depends, HTTPException,Form
 from sqlalchemy.orm import Session
 from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH
 from database import get_db
