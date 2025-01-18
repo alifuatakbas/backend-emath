@@ -59,13 +59,21 @@ async def add_question(
         if image:
             file_extension = os.path.splitext(image.filename)[1]
             unique_filename = f"{uuid4()}{file_extension}"
-            file_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+            # static klasörü içinde question_images klasörü oluştur
+            upload_dir = os.path.join("static", "question_images")
+            if not os.path.exists(upload_dir):
+                os.makedirs(upload_dir)
+
+            file_path = os.path.join(upload_dir, unique_filename)
 
             try:
                 with open(file_path, "wb") as buffer:
                     shutil.copyfileobj(image.file, buffer)
-                image_path = f"/question_images/{unique_filename}"
+                image_path = f"/question_images/{unique_filename}"  # URL yolunu düzelt
+                print(f"Debug - Kaydedilen resim yolu: {image_path}")
             except Exception as e:
+                print(f"Resim yükleme hatası: {str(e)}")
                 raise HTTPException(status_code=500, detail=f"Fotoğraf yüklenirken hata oluştu: {str(e)}")
 
         # Soru sayısını artır
@@ -93,8 +101,11 @@ async def add_question(
             "image_path": image_path
         }
 
+
     except Exception as e:
+
         print(f"Hata: {str(e)}")
+
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/exams/{exam_id}/submission-status")

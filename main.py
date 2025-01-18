@@ -11,7 +11,7 @@ except Exception as e:
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
 app.include_router(auth.router)
 app.include_router(exams.router)
 
@@ -26,5 +26,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Health check endpoint
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
