@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException,Formgi
 from sqlalchemy.orm import Session
 from app.schemas.exam_schemas import ExamCreateRequest, ExamSCH, QuestionSCH
 from database import get_db
@@ -9,6 +9,7 @@ from fastapi import File, UploadFile
 import shutil
 import os
 from uuid import uuid4
+
 
 
 # Normal router yerine admin prefix'li router kullanalım
@@ -35,68 +36,70 @@ if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
 
 
-@router.post("/admin/add-question/{exam_id}")
+@router.post("/add-question/{exam_id}")
 async def add_question(
-        exam_id: int,
-        text: str,
-        options: list[str],
-        correct_option_index: int,
-        image: UploadFile = File(None),  # Opsiyonel fotoğraf
-        db: Session = Depends(get_db),
-        current_user: UserDB = Depends(get_current_user)
+    exam_id: int,
+    text: str = Form(...),  # Form(...) kullan
+    options: list[str] = Form(...),
+    correct_option_index: int = Form(...),
+    image: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
 ):
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Yetkiniz yok")
+    try:
+        if current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
-    if len(options) != 5:
-        raise HTTPException(status_code=400, detail="Her soru için 5 seçenek gereklidir")
+        if len(options) != 5:
+            raise HTTPException(status_code=400, detail="Her soru için 5 seçenek gereklidir")
 
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+        exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
-    # Fotoğraf yükleme işlemi
-    image_path = None
-    if image:
-        # Güvenli bir dosya adı oluştur
-        file_extension = os.path.splitext(image.filename)[1]
-        unique_filename = f"{uuid4()}{file_extension}"
-        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        # Fotoğraf yükleme işlemi
+        image_path = None
+        if image:
+            file_extension = os.path.splitext(image.filename)[1]
+            unique_filename = f"{uuid4()}{file_extension}"
+            file_path = os.path.join(UPLOAD_DIR, unique_filename)
 
-        # Dosyayı kaydet
-        try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(image.file, buffer)
-            image_path = f"/question_images/{unique_filename}"  # DB'de saklanacak yol
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Fotoğraf yüklenirken hata oluştu: {str(e)}")
+            try:
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(image.file, buffer)
+                image_path = f"/question_images/{unique_filename}"
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Fotoğraf yüklenirken hata oluştu: {str(e)}")
 
-    question_number = exam.question_counter + 1
-    exam.question_counter = question_number
+        question_number = exam.question_counter + 1
+        exam.question_counter = question_number
 
-    # Soruyu oluştur
-    question = Question(
-        exam_id=exam_id,
-        text=text,
-        image=image_path,  # Fotoğraf yolunu kaydet
-        option_1=options[0],
-        option_2=options[1],
-        option_3=options[2],
-        option_4=options[3],
-        option_5=options[4],
-        correct_option_id=correct_option_index,
-        question_id=question_number
-    )
+        question = Question(
+            exam_id=exam_id,
+            text=text,
+            image=image_path,
+            option_1=options[0],
+            option_2=options[1],
+            option_3=options[2],
+            option_4=options[3],
+            option_5=options[4],
+            correct_option_id=correct_option_index,
+            question_id=question_number
+        )
 
-    db.add(question)
-    db.commit()
-    db.refresh(question)
+        db.add(question)
+        db.commit()
+        db.refresh(question)
 
-    return {
-        "message": "Soru ve seçenekler eklendi",
-        "question_id": question.question_id,
-        "image_path": image_path
-    }
+        return {
+            "message": "Soru ve seçenekler başarıyla eklendi",
+            "question_id": question.question_id,
+            "image_path": image_path
+        }
+
+    except Exception as e:
+        print(f"Hata: {str(e)}")  # Loglama için
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/exams/{exam_id}/submission-status")
 def check_submission_status(exam_id: int, current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
