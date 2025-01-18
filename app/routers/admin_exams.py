@@ -39,7 +39,7 @@ if not os.path.exists(UPLOAD_DIR):
 @router.post("/add-question/{exam_id}")
 async def add_question(
     exam_id: int,
-    text: str = Form(...),  # Form(...) kullan
+    text: str = Form(...),
     options: list[str] = Form(...),
     correct_option_index: int = Form(...),
     image: UploadFile = File(None),
@@ -49,9 +49,6 @@ async def add_question(
     try:
         if current_user.role != "admin":
             raise HTTPException(status_code=403, detail="Yetkiniz yok")
-
-        if len(options) != 5:
-            raise HTTPException(status_code=400, detail="Her soru için 5 seçenek gereklidir")
 
         exam = db.query(Exam).filter(Exam.id == exam_id).first()
         if not exam:
@@ -71,8 +68,8 @@ async def add_question(
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Fotoğraf yüklenirken hata oluştu: {str(e)}")
 
-        question_number = exam.question_counter + 1
-        exam.question_counter = question_number
+        # Soru sayısını artır
+        exam.question_counter += 1
 
         question = Question(
             exam_id=exam_id,
@@ -83,8 +80,7 @@ async def add_question(
             option_3=options[2],
             option_4=options[3],
             option_5=options[4],
-            correct_option_id=correct_option_index,
-            question_id=question_number
+            correct_option_id=correct_option_index
         )
 
         db.add(question)
@@ -93,12 +89,12 @@ async def add_question(
 
         return {
             "message": "Soru ve seçenekler başarıyla eklendi",
-            "question_id": question.question_id,
+            "id": question.id,  # question_id yerine id kullan
             "image_path": image_path
         }
 
     except Exception as e:
-        print(f"Hata: {str(e)}")  # Loglama için
+        print(f"Hata: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/exams/{exam_id}/submission-status")
