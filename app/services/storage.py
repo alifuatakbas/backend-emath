@@ -33,6 +33,7 @@ class S3Service:
                 region_name=region
             )
             self.bucket_name = bucket_name
+            self.region = region
 
         except Exception as e:
             print(f"S3 Error: {str(e)}")
@@ -43,16 +44,19 @@ class S3Service:
             content = await file.read()
             file_extension = os.path.splitext(file.filename)[1]
             unique_filename = f"{uuid4()}{file_extension}"
+            key = f"question_images/{unique_filename}"
 
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
-                Key=f"question_images/{unique_filename}",
+                Key=key,
                 Body=content,
                 ContentType=file.content_type,
                 ACL='public-read'
             )
 
-            url = f"https://{self.bucket_name}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/question_images/{unique_filename}"
+            # URL formatını güncelledik
+            url = f"https://{self.bucket_name}.s3.{self.region}.amazonaws.com/{key}"
+            print(f"File uploaded successfully. URL: {url}")
             return url
 
         except Exception as e:
