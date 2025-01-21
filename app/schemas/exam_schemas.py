@@ -36,3 +36,11 @@ class ExamSCH(BaseModel):
         from_attributes = True
 
 
+class ExamWithResult(BaseModel):
+    id: int
+    title: str
+    has_been_taken: bool = True
+
+    class Config:
+        from_attributes = True
+

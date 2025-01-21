@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException,status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamCreateRequest,ExamSCH,QuestionSCH
+from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
-from datetime import datetime, timedelta,date
+from datetime import datetime, timedelta
 import pytz
+from typing import List
 router = APIRouter()
 User = UserDB
 
@@ -258,22 +259,49 @@ def submit_exam(
         )
 
 
-@router.get("/exam-results/{exam_id}")
-def get_exam_results(
+@router.get("/exam-results/{exam_id}", response_model=ExamResultResponse)
+async def get_exam_result(
         exam_id: int,
-        current_user: UserDB = Depends(get_current_user),
+        current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Kullanıcının bu sınavdaki sonuçlarını getir
-    exam_result = db.query(ExamResult).filter(
-        ExamResult.user_id == current_user.id,
-        ExamResult.exam_id == exam_id
-    ).first()
+    result = (
+        db.query(ExamResult)
+        .filter(
+            ExamResult.exam_id == exam_id,
+            ExamResult.user_id == current_user.id
+        )
+        .first()
+    )
 
-    if not exam_result:
-        raise HTTPException(status_code=404, detail="Sınav sonucu bulunamadı")
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Bu sınav için sonuç bulunamadı"
+        )
+
+    total_questions = result.correct_answers + result.incorrect_answers
+    score_percentage = (result.correct_answers / total_questions * 100) if total_questions > 0 else 0
 
     return {
-        "correct_answers": exam_result.correct_answers,
-        "incorrect_answers": exam_result.incorrect_answers
+        "correct_answers": result.correct_answers,
+        "incorrect_answers": result.incorrect_answers,
+        "total_questions": total_questions,
+        "score_percentage": round(score_percentage, 2)
     }
+
+
+@router.get("/user/completed-exams", response_model=List[ExamWithResult])
+async def get_completed_exams(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    # Kullanıcının sonuçları olan sınavları getir
+    completed_exams = (
+        db.query(Exam)
+        .join(ExamResult, Exam.id == ExamResult.exam_id)
+        .filter(ExamResult.user_id == current_user.id)
+        .all()
+    )
+
+    return completed_exams
