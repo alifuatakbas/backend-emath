@@ -36,13 +36,14 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     db_user = UserDB(
         email=user.email,
         full_name=user.full_name,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        school_name=user.school_name,
+        branch=user.branch
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
     return db_user
-
 @router.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.email == form_data.username).first()

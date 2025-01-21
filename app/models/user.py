@@ -7,9 +7,11 @@ class UserDB(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(100), unique=True, index=True)  # 100 karakter uzunluğunda
-    full_name = Column(String(100))  # 100 karakter uzunluğunda
-    hashed_password = Column(String(100))  # 100 karakter uzunluğunda
-    role = Column(String(50), default="student")  # 50 karakter uzunluğunda
+    email = Column(String(100), unique=True, index=True)
+    full_name = Column(String(100))
+    hashed_password = Column(String(100))
+    role = Column(String(50), default="student")
+    school_name = Column(String(100), nullable=True)  # Yeni eklenen
+    branch = Column(String(50), nullable=True)        # Yeni eklenen
 
     exam_results = relationship("ExamResult", back_populates="user")
