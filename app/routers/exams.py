@@ -256,3 +256,24 @@ def submit_exam(
             status_code=500,
             detail=f"Sınav gönderilirken bir hata oluştu: {str(e)}"
         )
+
+
+@router.get("/exam-results/{exam_id}")
+def get_exam_results(
+        exam_id: int,
+        current_user: UserDB = Depends(get_current_user),
+        db: Session = Depends(get_db)
+):
+    # Kullanıcının bu sınavdaki sonuçlarını getir
+    exam_result = db.query(ExamResult).filter(
+        ExamResult.user_id == current_user.id,
+        ExamResult.exam_id == exam_id
+    ).first()
+
+    if not exam_result:
+        raise HTTPException(status_code=404, detail="Sınav sonucu bulunamadı")
+
+    return {
+        "correct_answers": exam_result.correct_answers,
+        "incorrect_answers": exam_result.incorrect_answers
+    }
