@@ -10,17 +10,29 @@ load_dotenv()
 class S3Service:
     def __init__(self):
         try:
+            # Environment variables'ları kontrol et
+            access_key = os.getenv('AWS_ACCESS_KEY')
+            secret_key = os.getenv('AWS_SECRET_KEY')
+            bucket_name = os.getenv('AWS_BUCKET_NAME')
+            region = os.getenv('AWS_REGION')
+
+            print("AWS Credentials Check:", {
+                "access_key": "✓" if access_key else "✗",
+                "secret_key": "✓" if secret_key else "✗",
+                "bucket_name": "✓" if bucket_name else "✗",
+                "region": "✓" if region else "✗"
+            })
+
+            if not all([access_key, secret_key, bucket_name, region]):
+                raise Exception("Missing AWS credentials")
+
             self.s3_client = boto3.client(
                 's3',
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-                region_name=os.getenv('AWS_REGION')
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=region
             )
-            self.bucket_name = os.getenv('AWS_BUCKET_NAME')
-
-            # Test connection
-            self.s3_client.head_bucket(Bucket=self.bucket_name)
-            print("Successfully connected to S3")
+            self.bucket_name = bucket_name
 
         except Exception as e:
             print(f"S3 Error: {str(e)}")
@@ -32,8 +44,6 @@ class S3Service:
             file_extension = os.path.splitext(file.filename)[1]
             unique_filename = f"{uuid4()}{file_extension}"
 
-            print(f"Attempting to upload {unique_filename} to {self.bucket_name}")
-
             self.s3_client.put_object(
                 Bucket=self.bucket_name,
                 Key=f"question_images/{unique_filename}",
@@ -43,7 +53,6 @@ class S3Service:
             )
 
             url = f"https://{self.bucket_name}.s3.{os.getenv('AWS_REGION')}.amazonaws.com/question_images/{unique_filename}"
-            print(f"Successfully uploaded. URL: {url}")
             return url
 
         except Exception as e:
