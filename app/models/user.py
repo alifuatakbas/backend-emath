@@ -15,3 +15,16 @@ class UserDB(Base):
     branch = Column(String(50), nullable=True)        # Yeni eklenen
 
     exam_results = relationship("ExamResult", back_populates="user")
+
+
+class Application(Base):
+    __tablename__ = "applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    full_name = Column(String, nullable=False)
+    email = Column(String, nullable=False)
+    phone = Column(String)
+    school = Column(String, nullable=False)
+    grade = Column(String, nullable=False)
+    message = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)

@@ -19,3 +19,12 @@ class User(UserBase):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+
+class ApplicationCreate(BaseModel):
+    fullName: str
+    email: str
+    phone: str | None = None
+    school: str
+    grade: str
+    message: str | None = None

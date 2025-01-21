@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import  OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from app.models.user import UserDB
-from app.schemas.user import User, UserCreate, Token
+from app.models.user import UserDB, Application
+from app.schemas.user import User, UserCreate, Token,ApplicationCreate
 from app.services.auth_service import (
     verify_password,
     get_password_hash,
@@ -114,3 +114,22 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
             status_code=400,
             detail="Geçersiz veya süresi dolmuş token"
         )
+
+
+@router.post("/applications")
+async def create_application(
+    application: ApplicationCreate,
+    db: Session = Depends(get_db)
+):
+    db_application = Application(
+        full_name=application.fullName,
+        email=application.email,
+        phone=application.phone,
+        school=application.school,
+        grade=application.grade,
+        message=application.message
+    )
+    db.add(db_application)
+    db.commit()
+    db.refresh(db_application)
+    return {"message": "Başvuru başarıyla alındı"}

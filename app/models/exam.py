@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime,Text
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime,timedelta
@@ -58,3 +58,4 @@ class ExamResult(Base):
             self.start_time = self.start_time.replace(tzinfo=pytz.UTC)
         if self.end_time and self.end_time.tzinfo is None:
             self.end_time = self.end_time.replace(tzinfo=pytz.UTC)
+
