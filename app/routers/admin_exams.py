@@ -6,14 +6,14 @@ from app.models.exam import Exam, Question, ExamResult
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
 from fastapi import File, UploadFile
-import shutil
 import os
-from uuid import uuid4
+from app.services.storage import S3Service
 
 
 
 # Normal router yerine admin prefix'li router kullanalım
 router = APIRouter(prefix="/admin", tags=["admin"])
+s3_service = S3Service()
 
 @router.post("/create-exam")
 def create_exam(request: ExamCreateRequest | None
@@ -55,26 +55,11 @@ async def add_question(
             raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
         # Fotoğraf yükleme işlemi
-        image_path = None
+        image_url = None
         if image:
-            file_extension = os.path.splitext(image.filename)[1]
-            unique_filename = f"{uuid4()}{file_extension}"
-
-            # static klasörü içinde question_images klasörü oluştur
-            upload_dir = os.path.join("static", "question_images")
-            if not os.path.exists(upload_dir):
-                os.makedirs(upload_dir)
-
-            file_path = os.path.join(upload_dir, unique_filename)
-
-            try:
-                with open(file_path, "wb") as buffer:
-                    shutil.copyfileobj(image.file, buffer)
-                image_path = f"/question_images/{unique_filename}"  # URL yolunu düzelt
-                print(f"Debug - Kaydedilen resim yolu: {image_path}")
-            except Exception as e:
-                print(f"Resim yükleme hatası: {str(e)}")
-                raise HTTPException(status_code=500, detail=f"Fotoğraf yüklenirken hata oluştu: {str(e)}")
+            image_url = await s3_service.upload_file(image)
+            if not image_url:
+                raise HTTPException(status_code=500, detail="Fotoğraf yüklenemedi")
 
         # Soru sayısını artır
         exam.question_counter += 1
@@ -82,7 +67,7 @@ async def add_question(
         question = Question(
             exam_id=exam_id,
             text=text,
-            image=image_path,
+            image=image_url,  # Artık tam URL
             option_1=options[0],
             option_2=options[1],
             option_3=options[2],
@@ -97,15 +82,12 @@ async def add_question(
 
         return {
             "message": "Soru ve seçenekler başarıyla eklendi",
-            "id": question.id,  # question_id yerine id kullan
-            "image_path": image_path
+            "id": question.id,
+            "image_url": image_url
         }
 
-
     except Exception as e:
-
         print(f"Hata: {str(e)}")
-
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/exams/{exam_id}/submission-status")
