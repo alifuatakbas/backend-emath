@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class QuestionAnswerSubmission(BaseModel):
     question_id: int
@@ -8,11 +8,22 @@ class QuestionAnswerSubmission(BaseModel):
 class ExamSubmission(BaseModel):
     answers: List[QuestionAnswerSubmission]
 
+
+class QuestionResultDetail(BaseModel):
+    question_text: str
+    question_image: Optional[str] = None
+    options: List[str]
+    correct_option: int
+    student_answer: Optional[int]
+    is_correct: bool
+
+
 class ExamResultResponse(BaseModel):
     correct_answers: int
     incorrect_answers: int
     total_questions: int
     score_percentage: float
+    questions: List[QuestionResultDetail]  # Yeni eklenen alan
 
     class Config:
         from_attributes = True

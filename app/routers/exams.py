@@ -305,13 +305,24 @@ async def get_exam_result(
             None
         )
 
+        # Seçenekleri bir liste olarak oluştur
+        options = [
+            question.option_1,
+            question.option_2,
+            question.option_3,
+            question.option_4,
+            question.option_5
+        ]
+        # None değerleri listeden çıkar
+        options = [opt for opt in options if opt is not None]
+
         questions_with_answers.append({
             "question_text": question.text,
-            "question_image": question.image,
-            "options": question.options,
-            "correct_option": question.correct_option,
-            "student_answer": student_answer.selected_option if student_answer else None,
-            "is_correct": student_answer.selected_option == question.correct_option if student_answer else False
+            "question_image": question.image_url if hasattr(question, 'image_url') else None,
+            "options": options,
+            "correct_option": question.correct_option_id - 1,  # 0-based index için
+            "student_answer": student_answer.selected_option - 1 if student_answer else None,  # 0-based index için
+            "is_correct": student_answer.is_correct if student_answer else False
         })
 
     total_questions = result.correct_answers + result.incorrect_answers
@@ -324,7 +335,6 @@ async def get_exam_result(
         "score_percentage": round(score_percentage, 2),
         "questions": questions_with_answers
     }
-
 
 @router.get("/user/completed-exams", response_model=List[ExamWithResult])
 async def get_completed_exams(
