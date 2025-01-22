@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult
 from database import get_db
-from app.models.exam import Exam, Question, ExamResult
+from app.models.exam import Exam, Question, ExamResult, Answer
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
 from datetime import datetime, timedelta
@@ -205,30 +205,32 @@ def submit_exam(
         if not existing_result:
             raise HTTPException(status_code=400, detail="Sınav henüz başlatılmamış")
 
-        # Debug için yazdırma
-        print(f"Submission answers: {submission.answers}")
-
-        # Doğru ve yanlış cevapları hesapla
-        correct_count = 0
-        incorrect_count = 0
-
-        # Önce sınavın tüm sorularını al
+        # Sınavın tüm sorularını al
         exam_questions = db.query(Question).filter(Question.exam_id == exam_id).all()
         questions_dict = {q.id: q for q in exam_questions}
 
-        print(f"Available questions: {[q.id for q in exam_questions]}")  # Debug için
+        correct_count = 0
+        incorrect_count = 0
 
+        # Öğrenci cevaplarını kaydet ve doğru/yanlış sayısını hesapla
         for answer in submission.answers:
-            print(f"Processing answer for question {answer.question_id}")  # Debug için
-
             question = questions_dict.get(answer.question_id)
             if question:
-                if answer.selected_option_id == question.correct_option_id:
+                is_correct = answer.selected_option_id == question.correct_option_id
+
+                # Answer modelini kullanarak cevabı kaydet
+                student_answer = Answer(
+                    exam_result_id=existing_result.id,
+                    question_id=question.id,
+                    selected_option=answer.selected_option_id,
+                    is_correct=is_correct
+                )
+                db.add(student_answer)
+
+                if is_correct:
                     correct_count += 1
                 else:
                     incorrect_count += 1
-            else:
-                print(f"Question not found: {answer.question_id}")  # Debug için
 
         total_questions = len(exam_questions)
         if total_questions == 0:
@@ -236,12 +238,12 @@ def submit_exam(
 
         score_percentage = (correct_count / total_questions) * 100
 
-        # Sonuçları kaydet
+        # Sonuçları güncelle
         existing_result.correct_answers = correct_count
         existing_result.incorrect_answers = incorrect_count
-        db.commit()
 
-        print(f"Final results - Correct: {correct_count}, Incorrect: {incorrect_count}")  # Debug için
+        # Değişiklikleri kaydet
+        db.commit()
 
         return ExamResultResponse(
             correct_answers=correct_count,
@@ -251,7 +253,6 @@ def submit_exam(
         )
 
     except Exception as e:
-        print(f"Error in submit_exam: {str(e)}")  # Debug için
         db.rollback()
         raise HTTPException(
             status_code=500,
@@ -280,6 +281,39 @@ async def get_exam_result(
             detail="Bu sınav için sonuç bulunamadı"
         )
 
+    # Sınav sorularını ve cevapları al
+    exam_questions = (
+        db.query(Question)
+        .filter(Question.exam_id == exam_id)
+        .all()
+    )
+
+    # Öğrencinin cevaplarını al
+    student_answers = (
+        db.query(Answer)
+        .filter(
+            Answer.exam_result_id == result.id
+        )
+        .all()
+    )
+
+    # Soru ve cevapları düzenle
+    questions_with_answers = []
+    for question in exam_questions:
+        student_answer = next(
+            (ans for ans in student_answers if ans.question_id == question.id),
+            None
+        )
+
+        questions_with_answers.append({
+            "question_text": question.text,
+            "question_image": question.image,
+            "options": question.options,
+            "correct_option": question.correct_option,
+            "student_answer": student_answer.selected_option if student_answer else None,
+            "is_correct": student_answer.selected_option == question.correct_option if student_answer else False
+        })
+
     total_questions = result.correct_answers + result.incorrect_answers
     score_percentage = (result.correct_answers / total_questions * 100) if total_questions > 0 else 0
 
@@ -287,7 +321,8 @@ async def get_exam_result(
         "correct_answers": result.correct_answers,
         "incorrect_answers": result.incorrect_answers,
         "total_questions": total_questions,
-        "score_percentage": round(score_percentage, 2)
+        "score_percentage": round(score_percentage, 2),
+        "questions": questions_with_answers
     }
 
 

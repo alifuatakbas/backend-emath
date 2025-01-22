@@ -32,6 +32,7 @@ class Question(Base):
     correct_option_id = Column(Integer, nullable=False)  # 1, 2, 3, 4, 5
 
     exam = relationship("Exam", back_populates="questions")
+    answers = relationship("Answer", back_populates="question")
 
 
 class ExamResult(Base):
@@ -57,3 +58,18 @@ class ExamResult(Base):
         if self.end_time and self.end_time.tzinfo is None:
             self.end_time = self.end_time.replace(tzinfo=pytz.UTC)
 
+    answers = relationship("Answer", back_populates="exam_result")
+
+
+class Answer(Base):
+    __tablename__ = "answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    exam_result_id = Column(Integer, ForeignKey("exam_results.id"))
+    question_id = Column(Integer, ForeignKey("questions.id"))
+    selected_option = Column(Integer)
+    is_correct = Column(Boolean, default=False)
+
+    # İlişkiler
+    exam_result = relationship("ExamResult", back_populates="answers")
+    question = relationship("Question", back_populates="answers")
