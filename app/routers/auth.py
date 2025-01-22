@@ -126,30 +126,27 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 
 # conf tanımlamasından önce ekleyin
 mail_settings = {
-    'MAIL_USERNAME': os.getenv('MAIL_USERNAME'),
-    'MAIL_PASSWORD': os.getenv('MAIL_PASSWORD'),
-    'MAIL_FROM': os.getenv('MAIL_FROM'),
-    'MAIL_SERVER': os.getenv('MAIL_SERVER'),
-    'ADMIN_EMAIL': os.getenv('ADMIN_EMAIL')
+    'MAIL_USERNAME': os.environ.get('MAIL_USERNAME', 'akbasalifuat@gmail.com'),
+    'MAIL_PASSWORD': os.environ.get('MAIL_PASSWORD', 'dbbomqqmapxzriwa'),
+    'MAIL_FROM': os.environ.get('MAIL_FROM', 'akbasalifuat@gmail.com'),
+    'MAIL_SERVER': os.environ.get('MAIL_SERVER', 'smtp.gmail.com'),
+    'ADMIN_EMAIL': os.environ.get('ADMIN_EMAIL', 'huseyin.yildiz@eolimpiyat.com')
 }
 
-# Eksik ayarları kontrol et
-missing_settings = [k for k, v in mail_settings.items() if not v]
-if missing_settings:
-    raise ValueError(f"Eksik email ayarları: {', '.join(missing_settings)}")
-
+# Email konfigürasyonu
 conf = ConnectionConfig(
-    MAIL_USERNAME = mail_settings['MAIL_USERNAME'],  # Anahtar isimlerini düzeltin
-    MAIL_PASSWORD = mail_settings['MAIL_PASSWORD'],
-    MAIL_FROM = mail_settings['MAIL_FROM'],
-    MAIL_PORT = int(os.getenv('MAIL_PORT', 587)),
-    MAIL_SERVER = mail_settings['MAIL_SERVER'],
-    MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,
-    USE_CREDENTIALS = True,
-    VALIDATE_CERTS = True
+    MAIL_USERNAME=mail_settings['MAIL_USERNAME'],
+    MAIL_PASSWORD=mail_settings['MAIL_PASSWORD'],
+    MAIL_FROM=mail_settings['MAIL_FROM'],
+    MAIL_PORT=int(os.environ.get('MAIL_PORT', '587')),
+    MAIL_SERVER=mail_settings['MAIL_SERVER'],
+    MAIL_STARTTLS=True,
+    MAIL_SSL_TLS=False,
+    USE_CREDENTIALS=True,
+    VALIDATE_CERTS=True
 )
-ADMIN_EMAILS = [mail_settings['ADMIN_EMAIL']]  # büyük harfle yazılmalı
+
+ADMIN_EMAILS = [mail_settings['ADMIN_EMAIL']]
 
 @router.post("/applications")
 async def create_application(

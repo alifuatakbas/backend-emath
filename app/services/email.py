@@ -22,38 +22,29 @@ logger.info(f"Env file exists: {env_path.exists()}")
 load_dotenv(dotenv_path=env_path)
 
 # Environment değişkenlerini kontrol et
-mail_settings = {
-    'MAIL_USERNAME': os.getenv('MAIL_USERNAME'),
-    'MAIL_PASSWORD': os.getenv('MAIL_PASSWORD'),
-    'MAIL_FROM': os.getenv('MAIL_FROM'),
-    'MAIL_SERVER': os.getenv('MAIL_SERVER'),
-    'MAIL_PORT': os.getenv('MAIL_PORT')
+mail_conf = {
+    'MAIL_USERNAME': os.environ.get('MAIL_USERNAME', 'akbasalifuat@gmail.com'),
+    'MAIL_PASSWORD': os.environ.get('MAIL_PASSWORD', 'dbbomqqmapxzriwa'),
+    'MAIL_FROM': os.environ.get('MAIL_FROM', 'akbasalifuat@gmail.com'),
+    'MAIL_PORT': int(os.environ.get('MAIL_PORT', '587')),
+    'MAIL_SERVER': os.environ.get('MAIL_SERVER', 'smtp.gmail.com'),
+    'MAIL_FROM_NAME': os.environ.get('MAIL_FROM_NAME', 'ExamSystem')
 }
 
-# Mail ayarlarını logla (şifre hariç)
-for key, value in mail_settings.items():
-    if 'PASSWORD' not in key:
-        logger.info(f"{key}: {value}")
-    else:
-        logger.info(f"{key}: {'*' * 8}")
-
-# Eksik ayarları kontrol et
-missing_settings = [k for k, v in mail_settings.items() if not v]
-if missing_settings:
-    raise ValueError(f"Missing email settings: {', '.join(missing_settings)}")
 
 # ConnectionConfig'i oluştur
 try:
     email_conf = ConnectionConfig(
-        MAIL_USERNAME = mail_settings['MAIL_USERNAME'],
-        MAIL_PASSWORD = mail_settings['MAIL_PASSWORD'],
-        MAIL_FROM = mail_settings['MAIL_FROM'],
-        MAIL_PORT = int(mail_settings['MAIL_PORT']),
-        MAIL_SERVER = mail_settings['MAIL_SERVER'],
-        MAIL_STARTTLS = True,
-        MAIL_SSL_TLS = False,
-        USE_CREDENTIALS = True,
-        VALIDATE_CERTS = True
+        MAIL_USERNAME=mail_conf['MAIL_USERNAME'],
+        MAIL_PASSWORD=mail_conf['MAIL_PASSWORD'],
+        MAIL_FROM=mail_conf['MAIL_FROM'],
+        MAIL_PORT=mail_conf['MAIL_PORT'],
+        MAIL_SERVER=mail_conf['MAIL_SERVER'],
+        MAIL_FROM_NAME=mail_conf['MAIL_FROM_NAME'],
+        MAIL_STARTTLS=True,
+        MAIL_SSL_TLS=False,
+        USE_CREDENTIALS=True,
+        VALIDATE_CERTS=True
     )
     logger.info("Email configuration created successfully")
 except Exception as e:
