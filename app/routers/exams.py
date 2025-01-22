@@ -302,7 +302,6 @@ async def get_exam_result(
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Sınav sonucunu bul
     result = (
         db.query(ExamResult)
         .filter(
@@ -318,30 +317,25 @@ async def get_exam_result(
             detail="Bu sınav için sonuç bulunamadı"
         )
 
-    # Sınav sorularını al
     exam_questions = (
         db.query(Question)
         .filter(Question.exam_id == exam_id)
         .all()
     )
 
-    # Öğrencinin cevaplarını al
     student_answers = (
         db.query(Answer)
         .filter(Answer.exam_result_id == result.id)
         .all()
     )
 
-    # Soru ve cevapları düzenle
     questions_with_answers = []
     for question in exam_questions:
-        # Her soru için öğrencinin cevabını bul
         student_answer = next(
             (ans for ans in student_answers if ans.question_id == question.id),
             None
         )
 
-        # Seçenekleri listele ve None olanları çıkar
         options = [
             question.option_1,
             question.option_2,
@@ -351,16 +345,18 @@ async def get_exam_result(
         ]
         options = [opt for opt in options if opt is not None]
 
+        # Doğru cevap indeksi 0'dan başlıyor (0=1.şık, 1=2.şık, ...)
+        correct_option_index = question.correct_option_id - 1
+
         questions_with_answers.append({
             "question_text": question.text,
             "question_image": question.image_url if hasattr(question, 'image_url') else None,
             "options": options,
-            "correct_option": question.correct_option_id,  # Doğrudan DB'deki değeri kullan
-            "student_answer": student_answer.selected_option if student_answer else None,  # Öğrencinin cevabı
+            "correct_option": correct_option_index,  # 0-based index (0=1.şık, 1=2.şık, ...)
+            "student_answer": student_answer.selected_option - 1 if student_answer else None,  # Öğrencinin cevabını da 0-based yap
             "is_correct": student_answer.is_correct if student_answer else False
         })
 
-    # Toplam soru sayısı ve yüzde hesapla
     total_questions = result.correct_answers + result.incorrect_answers
     score_percentage = (result.correct_answers / total_questions * 100) if total_questions > 0 else 0
 
