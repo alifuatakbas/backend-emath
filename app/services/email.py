@@ -1,6 +1,5 @@
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pydantic import EmailStr
-from typing import List
 from dotenv import load_dotenv
 import os
 from pathlib import Path
@@ -61,3 +60,5 @@ async def send_reset_email(email: EmailStr, token: str):
     except Exception as e:
         print(f"Email sending error: {str(e)}")
         return False
+
+

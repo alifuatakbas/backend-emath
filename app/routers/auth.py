@@ -1,6 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends
+import os
 from fastapi.security import  OAuth2PasswordRequestForm
-from sqlalchemy.orm import Session
 from app.models.user import UserDB, Application
 from app.schemas.user import User, UserCreate, Token,ApplicationCreate
 from app.services.auth_service import (
@@ -15,14 +14,17 @@ from app.schemas.auth_schemas import ForgotPasswordRequest, ResetPasswordRequest
 from app.services.email import send_reset_email
 from jose import jwt
 from datetime import datetime, timedelta
-import os
 from dotenv import load_dotenv
-SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+
+
 
 
 router = APIRouter()
 load_dotenv()
-
+SECRET_KEY = os.getenv('SECRET_KEY')
 @router.post("/register", response_model=User)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     logging.info(f"Received user data: {user}")
@@ -116,20 +118,94 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
         )
 
 
+conf = ConnectionConfig(
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME'),
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD'),
+    MAIL_FROM = os.getenv('MAIL_FROM'),
+    MAIL_PORT = int(os.getenv('MAIL_PORT', 587)),
+    MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.gmail.com'),
+    MAIL_TLS = True,
+    MAIL_SSL = False,
+    USE_CREDENTIALS = True
+)
+
+# Admin email listesi
+ADMIN_EMAILS = ["admin@eolimpiyat.com"]  # Bildirimleri alacak email adresleri
+
 @router.post("/applications")
 async def create_application(
     application: ApplicationCreate,
     db: Session = Depends(get_db)
 ):
-    db_application = Application(
-        full_name=application.fullName,
-        email=application.email,
-        phone=application.phone,
-        school=application.school,
-        grade=application.grade,
-        message=application.message
-    )
-    db.add(db_application)
-    db.commit()
-    db.refresh(db_application)
-    return {"message": "Başvuru başarıyla alındı"}
+    try:
+        # Veritabanına kaydet
+        db_application = Application(
+            full_name=application.fullName,
+            email=application.email,
+            phone=application.phone,
+            school=application.school,
+            grade=application.grade,
+            message=application.message
+        )
+        db.add(db_application)
+        db.commit()
+        db.refresh(db_application)
+
+        # Email içeriğini hazırla
+        html_content = f"""
+        <h2>Yeni Başvuru Alındı</h2>
+        <p><strong>Ad Soyad:</strong> {application.fullName}</p>
+        <p><strong>Email:</strong> {application.email}</p>
+        <p><strong>Telefon:</strong> {application.phone}</p>
+        <p><strong>Okul:</strong> {application.school}</p>
+        <p><strong>Sınıf:</strong> {application.grade}</p>
+        <p><strong>Mesaj:</strong> {application.message}</p>
+        <p><em>Bu email otomatik olarak gönderilmiştir.</em></p>
+        """
+
+        # Admin bildirimi gönder
+        message = MessageSchema(
+            subject="Yeni Başvuru Bildirimi - E-Olimpiyat",
+            recipients=ADMIN_EMAILS,
+            body=html_content,
+            subtype="html"
+        )
+
+        fm = FastMail(conf)
+        await fm.send_message(message)
+
+        # Başvuru sahibine teşekkür maili gönder
+        thank_you_content = f"""
+        <h2>Başvurunuz Alındı</h2>
+        <p>Sayın {application.fullName},</p>
+        <p>E-Olimpiyat'a yaptığınız başvuru başarıyla alınmıştır. 
+        En kısa sürede sizinle iletişime geçeceğiz.</p>
+        <br>
+        <p>Başvuru bilgileriniz:</p>
+        <ul>
+            <li>Ad Soyad: {application.fullName}</li>
+            <li>Email: {application.email}</li>
+            <li>Okul: {application.school}</li>
+            <li>Sınıf: {application.grade}</li>
+        </ul>
+        <br>
+        <p>Saygılarımızla,<br>E-Olimpiyat Ekibi</p>
+        """
+
+        thank_you_message = MessageSchema(
+            subject="Başvurunuz Alındı - E-Olimpiyat",
+            recipients=[application.email],
+            body=thank_you_content,
+            subtype="html"
+        )
+
+        await fm.send_message(thank_you_message)
+
+        return {"message": "Başvuru başarıyla alındı"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Başvuru işlemi sırasında bir hata oluştu: {str(e)}"
+        )
