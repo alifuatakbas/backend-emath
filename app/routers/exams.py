@@ -350,7 +350,7 @@ async def get_exam_result(
 
         questions_with_answers.append({
             "question_text": question.text,
-            "question_image": question.image_url if hasattr(question, 'image_url') else None,
+            "question_image": question.image if hasattr(question, 'image') else None,
             "options": options,
             "correct_option": correct_option_index,  # 0-based index (0=1.şık, 1=2.şık, ...)
             "student_answer": student_answer.selected_option - 1 if student_answer else None,  # Öğrencinin cevabını da 0-based yap
