@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 class UserBase(BaseModel):
     email: str
@@ -22,9 +22,9 @@ class Token(BaseModel):
 
 
 class ApplicationCreate(BaseModel):
-    fullName: str
-    email: str
-    phone: str | None = None
-    school: str
-    grade: str
-    message: str | None = None
+    fullName: str = Field(max_length=100)
+    email: str = Field(max_length=100)
+    phone: str = Field(max_length=20)
+    school: str = Field(max_length=200)
+    grade: str = Field(max_length=50)
+    message: str

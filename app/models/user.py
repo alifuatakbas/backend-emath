@@ -22,10 +22,10 @@ class Application(Base):
     __tablename__ = "applications"
 
     id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String, nullable=False)
-    email = Column(String, nullable=False)
-    phone = Column(String)
-    school = Column(String, nullable=False)
-    grade = Column(String, nullable=False)
-    message = Column(Text)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    full_name = Column(String(100))  # Uzunluğu artırıldı
+    email = Column(String(100))      # Uzunluğu artırıldı
+    phone = Column(String(20))       # Telefon numarası için yeterli
+    school = Column(String(200))     # Okul adı için yeterli
+    grade = Column(String(50))       # Sınıf bilgisi için yeterli
+    message = Column(Text)           # Uzun mesajlar için Text tipi
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
