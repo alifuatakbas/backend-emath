@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime,Text
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime,timedelta
@@ -20,15 +20,13 @@ class Question(Base):
     __tablename__ = "questions"
     id = Column(Integer, primary_key=True, index=True)
     exam_id = Column(Integer, ForeignKey("exams.id"))
-    text = Column(String, nullable=False)
-    image = Column(String, nullable=True)
-
-    # Seçeneklerin metinleri
-    option_1 = Column(String, default="A")
-    option_2 = Column(String, default="B")
-    option_3 = Column(String, default="C")
-    option_4 = Column(String, default="D")
-    option_5 = Column(String, default="E")
+    text = Column(Text)  # String yerine Text kullanın - sınırsız uzunluk için
+    image = Column(String(500), nullable=True)  # URL için yeterli uzunluk
+    option_1 = Column(String(500))  # Seçenekler için de uzunlukları artırabilirsiniz
+    option_2 = Column(String(500))
+    option_3 = Column(String(500))
+    option_4 = Column(String(500))
+    option_5 = Column(String(500))
 
     # Doğru cevabın ID'si
     correct_option_id = Column(Integer, nullable=False)  # 1, 2, 3, 4, 5
