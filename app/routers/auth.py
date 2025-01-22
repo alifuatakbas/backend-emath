@@ -18,13 +18,19 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from pathlib import Path
 
-
+current_dir = Path(__file__).parent.absolute()
+env_path = current_dir.parent.parent / '.env'
+print(f"Looking for .env at: {env_path}")
+print(f"File exists: {env_path.exists()}")
 
 
 router = APIRouter()
-load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
+
+
+
 @router.post("/register", response_model=User)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     logging.info(f"Received user data: {user}")
