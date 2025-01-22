@@ -24,7 +24,7 @@ current_dir = Path(__file__).parent.absolute()
 env_path = current_dir.parent.parent / '.env'
 print(f"Looking for .env at: {env_path}")
 print(f"File exists: {env_path.exists()}")
-
+load_dotenv(dotenv_path=env_path)  # env_path'i tanımladıktan hemen sonra yükleyin
 
 router = APIRouter()
 SECRET_KEY = os.getenv('SECRET_KEY')
@@ -126,11 +126,11 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 
 # conf tanımlamasından önce ekleyin
 mail_settings = {
-    'username': os.getenv('MAIL_USERNAME'),
-    'password': os.getenv('MAIL_PASSWORD'),
-    'from_email': os.getenv('MAIL_FROM'),
-    'server': os.getenv('MAIL_SERVER'),
-    'admin_email': os.getenv('ADMIN_EMAIL')
+    'MAIL_USERNAME': os.getenv('MAIL_USERNAME'),
+    'MAIL_PASSWORD': os.getenv('MAIL_PASSWORD'),
+    'MAIL_FROM': os.getenv('MAIL_FROM'),
+    'MAIL_SERVER': os.getenv('MAIL_SERVER'),
+    'ADMIN_EMAIL': os.getenv('ADMIN_EMAIL')
 }
 
 # Eksik ayarları kontrol et
@@ -139,18 +139,17 @@ if missing_settings:
     raise ValueError(f"Eksik email ayarları: {', '.join(missing_settings)}")
 
 conf = ConnectionConfig(
-    MAIL_USERNAME = mail_settings['username'],
-    MAIL_PASSWORD = mail_settings['password'],
-    MAIL_FROM = mail_settings['from_email'],
+    MAIL_USERNAME = mail_settings['MAIL_USERNAME'],  # Anahtar isimlerini düzeltin
+    MAIL_PASSWORD = mail_settings['MAIL_PASSWORD'],
+    MAIL_FROM = mail_settings['MAIL_FROM'],
     MAIL_PORT = int(os.getenv('MAIL_PORT', 587)),
-    MAIL_SERVER = mail_settings['server'],
+    MAIL_SERVER = mail_settings['MAIL_SERVER'],
     MAIL_STARTTLS = True,
-    MAIL_SSL_TLS = False,  # Yeni isim
+    MAIL_SSL_TLS = False,
     USE_CREDENTIALS = True,
-    VALIDATE_CERTS = True  # SSL sertifikalarını doğrula
+    VALIDATE_CERTS = True
 )
-
-ADMIN_EMAILS = [mail_settings['admin_email']]
+ADMIN_EMAILS = [mail_settings['ADMIN_EMAIL']]  # büyük harfle yazılmalı
 
 @router.post("/applications")
 async def create_application(
