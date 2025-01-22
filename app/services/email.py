@@ -18,16 +18,14 @@ load_dotenv(dotenv_path=env_path)
 # Debug için environment değişkenlerini kontrol et
 # Doğrudan değerleri kullan
 email_conf = ConnectionConfig(
-    MAIL_USERNAME="akbasalifuat@gmail.com",  # Doğrudan değer
-    MAIL_PASSWORD="dbbomqqmapxzriwa",  # Doğrudan değer
-    MAIL_FROM="akbasalifuat@gmail.com",  # Doğrudan değer
-    MAIL_PORT=587,
-    MAIL_SERVER="smtp.gmail.com",
-    MAIL_FROM_NAME="Exam System",
-    MAIL_SSL_TLS=False,
-    MAIL_STARTTLS=True,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME'),
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD'),
+    MAIL_FROM = os.getenv('MAIL_FROM'),
+    MAIL_PORT = int(os.getenv('MAIL_PORT', 587)),
+    MAIL_SERVER = os.getenv('MAIL_SERVER'),
+    MAIL_STARTTLS = True,
+    MAIL_SSL = False,
+    USE_CREDENTIALS = True
 )
 
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://e-math-frontend.vercel.app')

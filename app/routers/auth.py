@@ -118,21 +118,33 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
         )
 
 
+# conf tanımlamasından önce ekleyin
+mail_settings = {
+    'username': os.getenv('MAIL_USERNAME'),
+    'password': os.getenv('MAIL_PASSWORD'),
+    'from_email': os.getenv('MAIL_FROM'),
+    'server': os.getenv('MAIL_SERVER'),
+    'admin_email': os.getenv('ADMIN_EMAIL')
+}
+
+# Eksik ayarları kontrol et
+missing_settings = [k for k, v in mail_settings.items() if not v]
+if missing_settings:
+    raise ValueError(f"Eksik email ayarları: {', '.join(missing_settings)}")
+
 conf = ConnectionConfig(
-    MAIL_USERNAME="akbasalifuat@gmail.com",  # Doğrudan değer
-    MAIL_PASSWORD="dbbomqqmapxzriwa",  # Doğrudan değer
-    MAIL_FROM="akbasalifuat@gmail.com",  # Doğrudan değer
-    MAIL_PORT=587,
-    MAIL_SERVER="smtp.gmail.com",
-    MAIL_FROM_NAME="Exam System",
-    MAIL_SSL_TLS=False,
-    MAIL_STARTTLS=True,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True
+    MAIL_USERNAME = mail_settings['username'],
+    MAIL_PASSWORD = mail_settings['password'],
+    MAIL_FROM = mail_settings['from_email'],
+    MAIL_PORT = int(os.getenv('MAIL_PORT', 587)),
+    MAIL_SERVER = mail_settings['server'],
+    MAIL_STARTTLS = True,
+    MAIL_SSL_TLS = False,  # Yeni isim
+    USE_CREDENTIALS = True,
+    VALIDATE_CERTS = True  # SSL sertifikalarını doğrula
 )
 
-# Admin email listesi
-ADMIN_EMAILS = [os.getenv('ADMIN_EMAIL')] # Bildirimleri alacak email adresleri
+ADMIN_EMAILS = [mail_settings['admin_email']]
 
 @router.post("/applications")
 async def create_application(
