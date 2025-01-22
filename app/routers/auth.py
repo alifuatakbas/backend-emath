@@ -132,7 +132,7 @@ conf = ConnectionConfig(
 )
 
 # Admin email listesi
-ADMIN_EMAILS = ["admin@eolimpiyat.com"]  # Bildirimleri alacak email adresleri
+ADMIN_EMAILS = [os.getenv('ADMIN_EMAIL')] # Bildirimleri alacak email adresleri
 
 @router.post("/applications")
 async def create_application(
