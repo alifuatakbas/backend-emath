@@ -356,8 +356,8 @@ async def get_exam_result(
             "question_text": question.text,
             "question_image": question.image_url if hasattr(question, 'image_url') else None,
             "options": options,
-            "correct_option": question.correct_option_id - 1,  # 0-based index için
-            "student_answer": student_answer.selected_option - 1 if student_answer else None,  # 0-based index için
+            "correct_option": question.correct_option_id,  # -1 kaldırıldı
+            "student_answer": student_answer.selected_option if student_answer else None,  # -1 kaldırıldı
             "is_correct": student_answer.is_correct if student_answer else False
         })
 
