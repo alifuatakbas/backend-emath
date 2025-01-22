@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult
+from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult, QuestionResultDetail
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult, Answer
 from app.routers.auth import get_current_user
@@ -212,25 +212,31 @@ def submit_exam(
         correct_count = 0
         incorrect_count = 0
 
+        # Önce mevcut cevapları sil (eğer varsa)
+        db.query(Answer).filter(Answer.exam_result_id == existing_result.id).delete()
+
         # Öğrenci cevaplarını kaydet ve doğru/yanlış sayısını hesapla
+        answers_to_add = []
         for answer in submission.answers:
             question = questions_dict.get(answer.question_id)
             if question:
                 is_correct = answer.selected_option_id == question.correct_option_id
 
-                # Answer modelini kullanarak cevabı kaydet
                 student_answer = Answer(
                     exam_result_id=existing_result.id,
                     question_id=question.id,
                     selected_option=answer.selected_option_id,
                     is_correct=is_correct
                 )
-                db.add(student_answer)
+                answers_to_add.append(student_answer)
 
                 if is_correct:
                     correct_count += 1
                 else:
                     incorrect_count += 1
+
+        # Toplu olarak cevapları ekle
+        db.bulk_save_objects(answers_to_add)
 
         total_questions = len(exam_questions)
         if total_questions == 0:
@@ -241,6 +247,34 @@ def submit_exam(
         # Sonuçları güncelle
         existing_result.correct_answers = correct_count
         existing_result.incorrect_answers = incorrect_count
+        existing_result.completed = True  # Sınavı tamamlandı olarak işaretle
+
+        # Soru detaylarını al
+        questions_with_answers = []
+        for question in exam_questions:
+            student_answer = next(
+                (ans for ans in answers_to_add if ans.question_id == question.id),
+                None
+            )
+
+            options = [
+                question.option_1,
+                question.option_2,
+                question.option_3,
+                question.option_4,
+                question.option_5
+            ]
+            # None değerleri listeden çıkar
+            options = [opt for opt in options if opt is not None]
+
+            questions_with_answers.append(QuestionResultDetail(
+                question_text=question.text,
+                question_image=question.image_url if hasattr(question, 'image_url') else None,
+                options=options,
+                correct_option=question.correct_option_id,
+                student_answer=student_answer.selected_option if student_answer else None,
+                is_correct=student_answer.is_correct if student_answer else False
+            ))
 
         # Değişiklikleri kaydet
         db.commit()
@@ -249,10 +283,12 @@ def submit_exam(
             correct_answers=correct_count,
             incorrect_answers=incorrect_count,
             total_questions=total_questions,
-            score_percentage=score_percentage
+            score_percentage=score_percentage,
+            questions=questions_with_answers
         )
 
     except Exception as e:
+        print(f"Hata detayı: {str(e)}")
         db.rollback()
         raise HTTPException(
             status_code=500,
