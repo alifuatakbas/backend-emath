@@ -70,7 +70,9 @@ async def read_users_me(current_user: UserDB = Depends(get_current_user)):  # Us
         "id": current_user.id,
         "email": current_user.email,
         "full_name": current_user.full_name,
-        "role": current_user.role
+        "role": current_user.role,
+        "school_name": current_user.school_name,
+        "branch": current_user.branch
     }
 
 
