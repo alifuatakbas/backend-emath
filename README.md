@@ -2,7 +2,7 @@
 
 Online matematik eğitim platformunun backend API servisi.
 
-## 🚀 Teknolojiler
+##  Teknolojiler
 
 - Python
 - FastAPI
