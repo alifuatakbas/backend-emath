@@ -86,19 +86,40 @@ async def send_reset_email(email: EmailStr, token: str):
 
 
 async def send_verification_email(email: str, token: str):
-    html_content = f"""
-    <h2>E-Olimpiyat Email Doğrulama</h2>
-    <p>Hesabınızı doğrulamak için aşağıdaki linke tıklayın:</p>
-    <p><a href="https://eolimpiyat.com/verify-email?token={token}">Hesabımı Doğrula</a></p>
-    <p>Bu link 24 saat geçerlidir.</p>
-    """
+    try:
+        html_content = f"""
+            <html>
+                <body>
+                    <h2>Email Doğrulama</h2>
+                    <p>Merhaba,</p>
+                    <p>Email adresinizi doğrulamak için aşağıdaki linke tıklayın:</p>
+                    <p>
+                        <a href="{os.getenv('FRONTEND_URL')}/verify-email?token={token}" 
+                           style="padding: 10px 20px; 
+                                  background-color: #4CAF50; 
+                                  color: white; 
+                                  text-decoration: none; 
+                                  border-radius: 5px;">
+                            Email Adresimi Doğrula
+                        </a>
+                    </p>
+                    <p>Bu link 30 dakika geçerlidir.</p>
+                    <p>Eğer bu işlemi siz yapmadıysanız, bu emaili görmezden gelebilirsiniz.</p>
+                </body>
+            </html>
+        """
 
-    message = MessageSchema(
-        subject="E-Olimpiyat - Email Doğrulama",
-        recipients=[email],
-        body=html_content,
-        subtype="html"
-    )
+        message = MessageSchema(
+            subject="E-Olimpiyat - Email Doğrulama",
+            recipients=[email],
+            body=html_content,
+            subtype="html"
+        )
 
-    fm = FastMail(mail_conf)
-    await fm.send_message(message)
+        fm = FastMail(email_conf)
+        await fm.send_message(message)
+        return True
+    except Exception as e:
+        print(f"Email gönderme hatası: {str(e)}")
+        return False
+
