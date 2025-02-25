@@ -147,25 +147,9 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 @router.get("/verify-email")
 async def verify_email(token: str, db: Session = Depends(get_db)):
     try:
-        # Dosyanın üstünde tanımlı SECRET_KEY'i kullan
-        if not SECRET_KEY:
-            print("SECRET_KEY is not set")  # Debug için
-            raise HTTPException(
-                status_code=500,
-                detail="Sunucu yapılandırma hatası"
-            )
-
-        print(f"Attempting to decode token with SECRET_KEY")  # Debug için
-        # Token'ı decode et
+        # Token'ı decode et (diğer endpointlerdeki gibi doğrudan SECRET_KEY kullan)
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         email: str = payload.get("sub")
-        print(f"Decoded email: {email}")  # Debug için
-
-        if email is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Geçersiz token"
-            )
 
         # Kullanıcıyı bul
         user = db.query(UserDB).filter(UserDB.email == email).first()
@@ -183,21 +167,18 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
         user.is_verified = True
         user.verification_token = None  # Token'ı temizle
         db.commit()
-        print(f"User {email} verified successfully")  # Debug için
 
         return {"message": "Email adresi başarıyla doğrulandı"}
 
-    except JWTError as e:
-        print(f"JWT Error: {str(e)}")  # Debug için
+    except JWTError:
         raise HTTPException(
             status_code=400,
             detail="Geçersiz veya süresi dolmuş token"
         )
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")  # Debug için
         raise HTTPException(
             status_code=500,
-            detail=f"Bir hata oluştu: {str(e)}"
+            detail="Doğrulama işlemi sırasında bir hata oluştu"
         )
 
 # conf tanımlamasından önce ekleyin
