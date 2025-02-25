@@ -87,14 +87,21 @@ async def send_reset_email(email: EmailStr, token: str):
 
 async def send_verification_email(email: str, token: str):
     try:
-        html_content = f"""
+        verification_link = f"{FRONTEND_URL}/verify-email?token={token}"
+        logger.info(f"Sending verification email to: {email}")
+        logger.info(f"Verification link: {verification_link}")
+
+        message = MessageSchema(
+            subject="E-Olimpiyat - Email Doğrulama",
+            recipients=[email],
+            body=f"""
             <html>
                 <body>
                     <h2>Email Doğrulama</h2>
                     <p>Merhaba,</p>
                     <p>Email adresinizi doğrulamak için aşağıdaki linke tıklayın:</p>
                     <p>
-                        <a href="{os.getenv('FRONTEND_URL')}/verify-email?token={token}" 
+                        <a href="{verification_link}" 
                            style="padding: 10px 20px; 
                                   background-color: #4CAF50; 
                                   color: white; 
@@ -107,19 +114,15 @@ async def send_verification_email(email: str, token: str):
                     <p>Eğer bu işlemi siz yapmadıysanız, bu emaili görmezden gelebilirsiniz.</p>
                 </body>
             </html>
-        """
-
-        message = MessageSchema(
-            subject="E-Olimpiyat - Email Doğrulama",
-            recipients=[email],
-            body=html_content,
+            """,
             subtype="html"
         )
 
         fm = FastMail(email_conf)
         await fm.send_message(message)
+        logger.info(f"Verification email sent successfully to {email}")
         return True
     except Exception as e:
-        print(f"Email gönderme hatası: {str(e)}")
-        return False
+        logger.error(f"Error sending verification email to {email}: {str(e)}")
+        raise  # Hatayı yukarı fırlat
 
