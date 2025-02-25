@@ -31,48 +31,40 @@ router = APIRouter()
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 
-@router.post("/register", response_model=User)
+@router.post("/register")
 async def register(user: UserCreate, db: Session = Depends(get_db)):
-    logging.info(f"Received user data: {user}")
-
     # Email kontrolü
     db_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     if db_user:
-        raise HTTPException(status_code=400, detail="Email adresi zaten kayıtlı")
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Doğrulama tokeni oluştur
+    # Şifre hash'leme
+    hashed_password = get_password_hash(user.password)
+
+    # Verification token oluşturma
     verification_token = create_access_token(
-        data={"sub": user.email},
-        expires_delta=timedelta(hours=24)
+        data={"sub": user.email}  # expires_delta parametresini kaldırdık
     )
 
-    hashed_password = get_password_hash(user.password)
+    # Yeni kullanıcı oluşturma
     db_user = UserDB(
         email=user.email,
         full_name=user.full_name,
         hashed_password=hashed_password,
         school_name=user.school_name,
         branch=user.branch,
-        is_verified=False,
-        verification_token=verification_token
+        verification_token=verification_token,
+        is_verified=False
     )
 
-    try:
-        # Kullanıcıyı kaydet
-        db.add(db_user)
-        db.commit()
-        db.refresh(db_user)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
 
-        # Doğrulama emaili gönder
-        await send_verification_email(user.email, verification_token)
+    # Doğrulama emaili gönderme
+    await send_verification_email(user.email, verification_token)
 
-        return db_user
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Kayıt işlemi sırasında bir hata oluştu: {str(e)}"
-        )
+    return {"message": "Kayıt başarılı. Lütfen email adresinizi doğrulayın"}
 @router.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.email == form_data.username).first()
