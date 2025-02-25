@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pathlib import Path
+from config import settings
 
 
 current_dir = Path(__file__).parent.absolute()
@@ -147,9 +148,19 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 @router.get("/verify-email")
 async def verify_email(token: str, db: Session = Depends(get_db)):
     try:
-        # Token'ı decode et (diğer endpointlerdeki gibi doğrudan SECRET_KEY kullan)
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        # Token'ı decode et (settings'den SECRET_KEY ve ALGORITHM kullanarak)
+        payload = jwt.decode(
+            token,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
         email: str = payload.get("sub")
+
+        if email is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Geçersiz token"
+            )
 
         # Kullanıcıyı bul
         user = db.query(UserDB).filter(UserDB.email == email).first()
@@ -165,15 +176,20 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
 
         # Kullanıcıyı doğrulanmış olarak işaretle
         user.is_verified = True
-        user.verification_token = None  # Token'ı temizle
+        user.verification_token = None
         db.commit()
 
         return {"message": "Email adresi başarıyla doğrulandı"}
 
-    except JWTError:
+    except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=400,
-            detail="Geçersiz veya süresi dolmuş token"
+            detail="Doğrulama linkinin süresi dolmuş"
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz doğrulama linki"
         )
     except Exception as e:
         raise HTTPException(
