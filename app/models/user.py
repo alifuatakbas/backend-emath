@@ -13,6 +13,8 @@ class UserDB(Base):
     role = Column(String(50), default="student")
     school_name = Column(String(100), nullable=True)
     branch = Column(String(50), nullable=True)
+    is_verified = Column(Boolean, default=False)
+    verification_token = Column(String(255), unique=True, nullable=True)
 
     exam_results = relationship("ExamResult", back_populates="user")
 

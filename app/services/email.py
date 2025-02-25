@@ -83,3 +83,22 @@ async def send_reset_email(email: EmailStr, token: str):
     except Exception as e:
         logger.error(f"Error sending reset email to {email}: {str(e)}")
         raise  # Hatayı yukarı fırlat
+
+
+async def send_verification_email(email: str, token: str):
+    html_content = f"""
+    <h2>E-Olimpiyat Email Doğrulama</h2>
+    <p>Hesabınızı doğrulamak için aşağıdaki linke tıklayın:</p>
+    <p><a href="https://eolimpiyat.com/verify-email?token={token}">Hesabımı Doğrula</a></p>
+    <p>Bu link 24 saat geçerlidir.</p>
+    """
+
+    message = MessageSchema(
+        subject="E-Olimpiyat - Email Doğrulama",
+        recipients=[email],
+        body=html_content,
+        subtype="html"
+    )
+
+    fm = FastMail(mail_conf)
+    await fm.send_message(message)

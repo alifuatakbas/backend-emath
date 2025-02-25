@@ -11,7 +11,7 @@ from app.services.auth_service import (
 from database import get_db
 import logging
 from app.schemas.auth_schemas import ForgotPasswordRequest, ResetPasswordRequest
-from app.services.email import send_reset_email
+from app.services.email import send_reset_email, send_verification_email
 from jose import jwt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pathlib import Path
+
 
 current_dir = Path(__file__).parent.absolute()
 env_path = current_dir.parent.parent / '.env'
@@ -30,7 +31,6 @@ router = APIRouter()
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 
-
 @router.post("/register", response_model=User)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     logging.info(f"Received user data: {user}")
@@ -40,18 +40,39 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(status_code=400, detail="Email adresi zaten kayıtlı")
 
+    # Doğrulama tokeni oluştur
+    verification_token = create_access_token(
+        data={"sub": user.email},
+        expires_delta=timedelta(hours=24)
+    )
+
     hashed_password = get_password_hash(user.password)
     db_user = UserDB(
         email=user.email,
         full_name=user.full_name,
         hashed_password=hashed_password,
         school_name=user.school_name,
-        branch=user.branch
+        branch=user.branch,
+        is_verified=False,
+        verification_token=verification_token
     )
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+
+    try:
+        # Kullanıcıyı kaydet
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
+
+        # Doğrulama emaili gönder
+        await send_verification_email(user.email, verification_token)
+
+        return db_user
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Kayıt işlemi sırasında bir hata oluştu: {str(e)}"
+        )
 @router.post("/token", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.email == form_data.username).first()
@@ -60,6 +81,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
 
     if not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Email veya şifre hatalı")
+
+    if not user.is_verified:
+        raise HTTPException(status_code=400, detail="Lütfen email adresinizi doğrulayın")
 
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -118,6 +142,33 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
         db.commit()
 
         return {"message": "Şifreniz başarıyla güncellendi"}
+
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=400,
+            detail="Geçersiz veya süresi dolmuş token"
+        )
+@router.get("/verify-email")
+async def verify_email(token: str, db: Session = Depends(get_db)):
+    try:
+        # Token'ı doğrula
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        email = payload.get("sub")
+
+        user = db.query(UserDB).filter(
+            UserDB.email == email,
+            UserDB.verification_token == token
+        ).first()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+
+        # Kullanıcıyı doğrulanmış olarak işaretle
+        user.is_verified = True
+        user.verification_token = None  # Token'ı temizle
+        db.commit()
+
+        return {"message": "Email başarıyla doğrulandı"}
 
     except jwt.JWTError:
         raise HTTPException(
