@@ -146,12 +146,18 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
 
 @router.get("/verify-email")
 async def verify_email(token: str, db: Session = Depends(get_db)):
+    print(f"Received verification request with token: {token}")  # Debug log
+
     try:
         # Token'ı decode et
         payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        print(f"Decoded payload: {payload}")  # Debug log
+
         email: str = payload.get("sub")
+        print(f"Email from token: {email}")  # Debug log
 
         if email is None:
+            print("Email not found in token")  # Debug log
             raise HTTPException(
                 status_code=400,
                 detail="Geçersiz token"
@@ -160,6 +166,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
         # Kullanıcıyı bul
         user = db.query(UserDB).filter(UserDB.email == email).first()
         if not user:
+            print(f"User not found for email: {email}")  # Debug log
             raise HTTPException(
                 status_code=404,
                 detail="Kullanıcı bulunamadı"
@@ -167,24 +174,28 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
 
         # Kullanıcı zaten doğrulanmış mı kontrol et
         if user.is_verified:
+            print(f"User {email} already verified")  # Debug log
             return {"message": "Email adresi zaten doğrulanmış"}
 
         # Kullanıcıyı doğrulanmış olarak işaretle
         user.is_verified = True
         user.verification_token = None  # Token'ı temizle
         db.commit()
+        print(f"User {email} verified successfully")  # Debug log
 
         return {"message": "Email adresi başarıyla doğrulandı"}
 
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT Error: {str(e)}")  # Debug log
         raise HTTPException(
             status_code=400,
             detail="Geçersiz veya süresi dolmuş token"
         )
     except Exception as e:
+        print(f"Unexpected error: {str(e)}")  # Debug log
         raise HTTPException(
             status_code=500,
-            detail="Bir hata oluştu. Lütfen daha sonra tekrar deneyin."
+            detail=f"Bir hata oluştu: {str(e)}"
         )
 
 
