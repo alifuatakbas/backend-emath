@@ -87,7 +87,7 @@ async def send_reset_email(email: EmailStr, token: str):
 
 async def send_verification_email(email: str, token: str):
     try:
-        verification_link = f"{FRONTEND_URL}/verify-email?token={token}"
+        verification_link = "eolimpiyat.com/verify-email?token={token}"
         logger.info(f"Sending verification email to: {email}")
         logger.info(f"Verification link: {verification_link}")
 
