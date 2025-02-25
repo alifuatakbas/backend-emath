@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean
 from database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime  # datetime.datetime yerine datetime kullanmak daha temiz
+
 
 class UserDB(Base):
     __tablename__ = "users"
