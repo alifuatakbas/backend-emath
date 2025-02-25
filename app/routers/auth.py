@@ -12,7 +12,7 @@ from database import get_db
 import logging
 from app.schemas.auth_schemas import ForgotPasswordRequest, ResetPasswordRequest
 from app.services.email import send_reset_email, send_verification_email
-from jose import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
@@ -140,32 +140,51 @@ async def reset_password(request: ResetPasswordRequest, db: Session = Depends(ge
             status_code=400,
             detail="Geçersiz veya süresi dolmuş token"
         )
+
+
+# app/routers/auth.py
+
 @router.get("/verify-email")
 async def verify_email(token: str, db: Session = Depends(get_db)):
     try:
-        # Token'ı doğrula
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        email = payload.get("sub")
+        # Token'ı decode et
+        payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        email: str = payload.get("sub")
 
-        user = db.query(UserDB).filter(
-            UserDB.email == email,
-            UserDB.verification_token == token
-        ).first()
+        if email is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Geçersiz token"
+            )
 
+        # Kullanıcıyı bul
+        user = db.query(UserDB).filter(UserDB.email == email).first()
         if not user:
-            raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
+            raise HTTPException(
+                status_code=404,
+                detail="Kullanıcı bulunamadı"
+            )
+
+        # Kullanıcı zaten doğrulanmış mı kontrol et
+        if user.is_verified:
+            return {"message": "Email adresi zaten doğrulanmış"}
 
         # Kullanıcıyı doğrulanmış olarak işaretle
         user.is_verified = True
         user.verification_token = None  # Token'ı temizle
         db.commit()
 
-        return {"message": "Email başarıyla doğrulandı"}
+        return {"message": "Email adresi başarıyla doğrulandı"}
 
-    except jwt.JWTError:
+    except JWTError:
         raise HTTPException(
             status_code=400,
             detail="Geçersiz veya süresi dolmuş token"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Bir hata oluştu. Lütfen daha sonra tekrar deneyin."
         )
 
 
