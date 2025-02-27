@@ -28,7 +28,7 @@ mail_conf = {
     'MAIL_FROM': os.environ.get('MAIL_FROM', 'akbasalifuat@gmail.com'),
     'MAIL_PORT': int(os.environ.get('MAIL_PORT', '587')),
     'MAIL_SERVER': os.environ.get('MAIL_SERVER', 'smtp.gmail.com'),
-    'MAIL_FROM_NAME': os.environ.get('MAIL_FROM_NAME', 'ExamSystem')
+    'MAIL_FROM_NAME': os.environ.get('MAIL_FROM_NAME', 'Eolimpiyat')
 }
 
 
