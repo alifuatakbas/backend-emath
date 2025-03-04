@@ -14,7 +14,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
 
-
+    # Test deployment
     class Config:
         from_attributes = True
 
