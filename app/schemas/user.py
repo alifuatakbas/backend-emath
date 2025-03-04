@@ -5,6 +5,8 @@ class UserBase(BaseModel):
     full_name: str
     school_name: str
     branch: str
+    parent_name: str  # Eklendi
+    phone: str
 
 class UserCreate(UserBase):
     password: str

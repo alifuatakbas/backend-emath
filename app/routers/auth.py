@@ -54,6 +54,8 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
         hashed_password=hashed_password,
         school_name=user.school_name,
         branch=user.branch,
+        parent_name=user.parent_name,  # Eklendi
+        phone=user.phone,  # Eklendi
         verification_token=verification_token,
         is_verified=False
     )

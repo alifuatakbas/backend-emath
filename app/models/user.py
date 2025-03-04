@@ -15,6 +15,8 @@ class UserDB(Base):
     school_name = Column(String(100), nullable=True)
     branch = Column(String(50), nullable=True)
     is_verified = Column(Boolean, default=False)
+    parent_name = Column(String(100))  # Eklendi
+    phone = Column(String(20))
     verification_token = Column(String(255), unique=True, nullable=True)
 
     exam_results = relationship("ExamResult", back_populates="user")
