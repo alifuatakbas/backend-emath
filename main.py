@@ -24,16 +24,17 @@ app.include_router(admin_exams.router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://e-math-frontend.vercel.app",
-        "http://localhost:3000",
-        "https://www.eolimpiyat.com",  # https ekleyin
+        "https://www.eolimpiyat.com",
         "https://eolimpiyat.com",
+        "http://localhost:3000",
         "https://api.eolimpiyat.com"
-        # www olmayan versiyonu da ekleyin
     ],
+    allow_origin_regex="https://.*\.eolimpiyat\.com",  # Alt domainler için
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
