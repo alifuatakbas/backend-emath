@@ -6,7 +6,7 @@ from app.models.exam import Exam, Question, ExamResult, Answer, ExamRegistration
 from app.routers.auth import get_current_user
 from app.models.user import UserDB
 from datetime import datetime, timedelta
-import pytz
+
 from typing import List
 router = APIRouter()
 User = UserDB
@@ -77,7 +77,7 @@ def get_exam(
     if not exam:
         raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
-    current_time = datetime.now(pytz.UTC)
+    current_time = datetime.utcnow()
 
     # Admin değilse kontrolleri yap
     if current_user.role != "admin":
