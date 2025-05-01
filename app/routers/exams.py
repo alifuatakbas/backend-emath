@@ -451,48 +451,58 @@ async def register_for_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    current_time = datetime.now(pytz.UTC)
+    try:
+        # datetime.now(pytz.UTC) yerine datetime.utcnow() kullanıyoruz
+        current_time = datetime.utcnow()
 
-    # Sınavın var olup olmadığını kontrol et
-    exam = db.query(Exam).filter(Exam.id == exam_id).first()
-    if not exam:
-        raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+        # Sınavın var olup olmadığını kontrol et
+        exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
-    # Başvuru tarih kontrolü
-    if current_time < exam.registration_start_date:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Sınav başvuruları {exam.registration_start_date.strftime('%d.%m.%Y %H:%M')} tarihinde başlayacak"
+        # Başvuru tarih kontrolü
+        if current_time < exam.registration_start_date:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Sınav başvuruları {exam.registration_start_date.strftime('%d.%m.%Y %H:%M')} tarihinde başlayacak"
+            )
+
+        if current_time > exam.registration_end_date:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Sınav başvuruları {exam.registration_end_date.strftime('%d.%m.%Y %H:%M')} tarihinde sona erdi"
+            )
+
+        # Kullanıcının daha önce kaydolup olmadığını kontrol et
+        existing_registration = db.query(ExamRegistration).filter(
+            ExamRegistration.user_id == current_user.id,
+            ExamRegistration.exam_id == exam_id
+        ).first()
+
+        if existing_registration:
+            raise HTTPException(
+                status_code=400,
+                detail="Bu sınava zaten kayıt oldunuz"
+            )
+
+        # Yeni kayıt oluştur
+        registration = ExamRegistration(
+            user_id=current_user.id,
+            exam_id=exam_id,
+            registration_date=current_time  # Kayıt tarihini de UTC olarak kaydediyoruz
         )
 
-    if current_time > exam.registration_end_date:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Sınav başvuruları {exam.registration_end_date.strftime('%d.%m.%Y %H:%M')} tarihinde sona erdi"
-        )
+        db.add(registration)
+        db.commit()
 
-    # Kullanıcının daha önce kaydolup olmadığını kontrol et
-    existing_registration = db.query(ExamRegistration).filter(
-        ExamRegistration.user_id == current_user.id,
-        ExamRegistration.exam_id == exam_id
-    ).first()
+        return {
+            "message": "Sınava başarıyla kayıt oldunuz",
+            "exam_date": exam.exam_start_date.strftime("%d.%m.%Y %H:%M")
+        }
 
-    if existing_registration:
-        raise HTTPException(
-            status_code=400,
-            detail="Bu sınava zaten kayıt oldunuz"
-        )
-
-    # Yeni kayıt oluştur
-    registration = ExamRegistration(
-        user_id=current_user.id,
-        exam_id=exam_id
-    )
-
-    db.add(registration)
-    db.commit()
-
-    return {
-        "message": "Sınava başarıyla kayıt oldunuz",
-        "exam_date": exam.exam_start_date.strftime("%d.%m.%Y %H:%M")
-    }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Registration error: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Kayıt işlemi sırasında bir hata oluştu")
