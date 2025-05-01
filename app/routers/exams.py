@@ -494,7 +494,8 @@ async def register_for_exam(
         registration = ExamRegistration(
             user_id=current_user.id,
             exam_id=exam_id,
-            registration_date=current_time  # Kayıt tarihini de UTC olarak kaydediyoruz
+            registration_date=current_time,  # Kayıt tarihini de UTC olarak kaydediyoruz
+            user_name = current_user.full_name
         )
 
         db.add(registration)

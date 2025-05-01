@@ -87,6 +87,7 @@ class ExamRegistration(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     exam_id = Column(Integer, ForeignKey("exams.id"))
     registration_date = Column(DateTime, default=datetime.utcnow)
+    user_name = Column(String(100))  # Yeni kolon ekleyin
 
     user = relationship("UserDB", back_populates="exam_registrations")
     exam = relationship("Exam", back_populates="registrations")
