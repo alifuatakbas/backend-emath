@@ -20,7 +20,8 @@ def get_exams(
     db: Session = Depends(get_db)
 ):
     try:
-        current_time = datetime.now(pytz.UTC)
+        # Timezone'suz datetime kullanımı
+        current_time = datetime.utcnow()  # datetime.now(pytz.UTC) yerine
 
         if current_user.role == "admin":
             exams = db.query(Exam).all()
@@ -40,12 +41,12 @@ def get_exams(
                 "exam_start_date": exam.exam_start_date,
                 "exam_end_date": exam.exam_end_date,
                 "can_register": check_registration_available(exam, current_time),
-                "status": ExamStatus(get_exam_status(exam, current_time))  # Enum'a dönüştürme
+                "status": get_exam_status(exam, current_time)
             }
             for exam in exams
         ]
     except Exception as e:
-        print(f"Error in get_exams: {str(e)}")
+        print(f"Error in get_exams: {str(e)}")  # Hata ayıklama için
         raise HTTPException(status_code=500, detail=str(e))
 
 def check_registration_available(exam: Exam, current_time: datetime) -> bool:
