@@ -4,6 +4,10 @@ from sqlalchemy.orm import relationship
 from datetime import datetime  # datetime.datetime yerine datetime kullanmak daha temiz
 
 
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.orm import relationship
+from database import Base
+
 class UserDB(Base):
     __tablename__ = "users"
 
@@ -15,15 +19,15 @@ class UserDB(Base):
     school_name = Column(String(100), nullable=True)
     branch = Column(String(50), nullable=True)
     is_verified = Column(Boolean, default=False)
-    parent_name = Column(String(100))  # Eklendi
+    parent_name = Column(String(100))
     phone = Column(String(20))
     verification_token = Column(String(255), unique=True, nullable=True)
 
     exam_results = relationship("ExamResult", back_populates="user")
+    exam_registrations = relationship("ExamRegistration", back_populates="user")  # Yeni eklenen ilişki
 
     def __repr__(self):
-        return f"<User {self.email}>"  # Debug için yararlı
-
+        return f"<User {self.email}>"
 
 class Application(Base):
     __tablename__ = "applications"

@@ -1,5 +1,28 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from enum import Enum
+from datetime import datetime
+
+class ExamStatus(str, Enum):
+    UNPUBLISHED = "unpublished"
+    REGISTRATION_PENDING = "registration_pending"
+    REGISTRATION_OPEN = "registration_open"
+    REGISTRATION_CLOSED = "registration_closed"
+    EXAM_ACTIVE = "exam_active"
+    COMPLETED = "completed"
+
+class ExamListResponse(BaseModel):
+    id: int
+    title: str
+    registration_start_date: datetime
+    registration_end_date: datetime
+    exam_start_date: datetime
+    exam_end_date: Optional[datetime] = None
+    can_register: bool
+    status: ExamStatus
+
+    class Config:
+        from_attributes = True
 
 class QuestionAnswerSubmission(BaseModel):
     question_id: int
@@ -30,6 +53,10 @@ class ExamResultResponse(BaseModel):
 
 class ExamCreateRequest(BaseModel):
     title: str
+    registration_start_date: datetime
+    registration_end_date: datetime
+    exam_start_date: datetime
+    exam_end_date: Optional[datetime] = None
 
 class QuestionSCH(BaseModel):
     id: int
@@ -41,7 +68,11 @@ class ExamSCH(BaseModel):
     id: int
     title: str
     is_published: bool
-    questions: List[QuestionSCH]  # Sınavın soruları
+    registration_start_date: datetime
+    registration_end_date: datetime
+    exam_start_date: datetime
+    exam_end_date: Optional[datetime] = None
+    questions: List[QuestionSCH]
 
     class Config:
         from_attributes = True
@@ -51,6 +82,10 @@ class ExamWithResult(BaseModel):
     id: int
     title: str
     has_been_taken: bool = True
+    correct_answers: Optional[int] = None
+    incorrect_answers: Optional[int] = None
+    score_percentage: Optional[float] = None
+    completion_date: Optional[datetime] = None
 
     class Config:
         from_attributes = True

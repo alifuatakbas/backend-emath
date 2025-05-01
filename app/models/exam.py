@@ -9,11 +9,16 @@ class Exam(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     is_published = Column(Boolean, default=False)
+    registration_start_date = Column(DateTime(timezone=True), nullable=True)
+    registration_end_date = Column(DateTime(timezone=True), nullable=True)
+    exam_start_date = Column(DateTime(timezone=True), nullable=True)
+    exam_end_date = Column(DateTime(timezone=True), nullable=True)
 
     questions = relationship("Question", back_populates="exam")
     exam_results = relationship("ExamResult", back_populates="exam")
-
-    question_counter = Column(Integer, default=0)  # Yeni eklenen soru sayısını tutmak için
+    registrations = relationship("ExamRegistration", back_populates="exam")
+    question_counter = Column(Integer, default=0)
+    # Yeni eklenen soru sayısını tutmak için
 
 
 class Question(Base):
@@ -73,3 +78,15 @@ class Answer(Base):
     # İlişkiler
     exam_result = relationship("ExamResult", back_populates="answers")
     question = relationship("Question", back_populates="answers")
+
+
+class ExamRegistration(Base):
+    __tablename__ = "exam_registrations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    exam_id = Column(Integer, ForeignKey("exams.id"))
+    registration_date = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("UserDB", back_populates="exam_registrations")
+    exam = relationship("Exam", back_populates="registrations")

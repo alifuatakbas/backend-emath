@@ -8,6 +8,10 @@ from app.models.user import UserDB
 from fastapi import File, UploadFile
 import os
 from app.services.storage import S3Service
+import pytz
+from datetime import datetime
+from pydantic import BaseModel
+
 
 
 
@@ -15,18 +19,43 @@ from app.services.storage import S3Service
 router = APIRouter(prefix="/admin", tags=["admin"])
 s3_service = S3Service()
 
-@router.post("/create-exam")
-def create_exam(request: ExamCreateRequest | None
-                , db: Session = Depends(get_db),
-                current_user: UserDB = Depends(get_current_user)):
 
+class ExamCreateRequest(BaseModel):
+    title: str
+    registration_start_date: datetime
+    registration_end_date: datetime
+    exam_start_date: datetime
+    exam_end_date: datetime | None = None
+
+
+@router.post("/create-exam")
+def create_exam(
+        request: ExamCreateRequest,
+        db: Session = Depends(get_db),
+        current_user: UserDB = Depends(get_current_user)
+):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
-    exam = Exam(title=request.title)
+
+    # Tarihleri UTC'ye çevir
+    exam = Exam(
+        title=request.title,
+        registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC),
+        registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC),
+        exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
+        exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None
+    )
+
+    # Tarih kontrolü
+    if exam.registration_end_date > exam.exam_start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="Başvuru bitiş tarihi sınav başlangıç tarihinden sonra olamaz"
+        )
+
     db.add(exam)
     db.commit()
     return {"message": "Sınav oluşturuldu", "exam_id": exam.id}
-
 
 
 
