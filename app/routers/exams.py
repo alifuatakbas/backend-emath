@@ -457,22 +457,26 @@ async def register_for_exam(
         db: Session = Depends(get_db)
 ):
     try:
-        # datetime.now(pytz.UTC) yerine datetime.utcnow() kullanıyoruz
+        print(f"Registration attempt - Exam ID: {exam_id}, User ID: {current_user.id}")  # Debug log
         current_time = datetime.utcnow()
 
         # Sınavın var olup olmadığını kontrol et
         exam = db.query(Exam).filter(Exam.id == exam_id).first()
         if not exam:
+            print(f"Exam not found: {exam_id}")  # Debug log
             raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
         # Başvuru tarih kontrolü
         if current_time < exam.registration_start_date:
+            print(
+                f"Registration not started yet. Current: {current_time}, Start: {exam.registration_start_date}")  # Debug log
             raise HTTPException(
                 status_code=403,
                 detail=f"Sınav başvuruları {exam.registration_start_date.strftime('%d.%m.%Y %H:%M')} tarihinde başlayacak"
             )
 
         if current_time > exam.registration_end_date:
+            print(f"Registration ended. Current: {current_time}, End: {exam.registration_end_date}")  # Debug log
             raise HTTPException(
                 status_code=403,
                 detail=f"Sınav başvuruları {exam.registration_end_date.strftime('%d.%m.%Y %H:%M')} tarihinde sona erdi"
@@ -485,6 +489,7 @@ async def register_for_exam(
         ).first()
 
         if existing_registration:
+            print(f"User already registered - User ID: {current_user.id}, Exam ID: {exam_id}")  # Debug log
             raise HTTPException(
                 status_code=400,
                 detail="Bu sınava zaten kayıt oldunuz"
@@ -494,9 +499,10 @@ async def register_for_exam(
         registration = ExamRegistration(
             user_id=current_user.id,
             exam_id=exam_id,
-            registration_date=current_time,  # Kayıt tarihini de UTC olarak kaydediyoruz
-            user_name = current_user.full_name
+            registration_date=current_time
         )
+
+        print(f"Creating new registration - User ID: {current_user.id}, Exam ID: {exam_id}")  # Debug log
 
         db.add(registration)
         db.commit()
@@ -509,6 +515,6 @@ async def register_for_exam(
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"Registration error: {str(e)}")
+        print(f"Registration error: {str(e)}")  # Hata detayını görelim
         db.rollback()
-        raise HTTPException(status_code=500, detail="Kayıt işlemi sırasında bir hata oluştu")
+        raise HTTPException(status_code=500, detail=str(e))
