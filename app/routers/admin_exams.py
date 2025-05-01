@@ -11,6 +11,7 @@ from app.services.storage import S3Service
 import pytz
 from datetime import datetime
 from pydantic import BaseModel
+from app.services.schedular import schedule_exam_events
 
 
 
@@ -27,7 +28,6 @@ class ExamCreateRequest(BaseModel):
     exam_start_date: datetime
     exam_end_date: datetime | None = None
 
-
 @router.post("/create-exam")
 def create_exam(
         request: ExamCreateRequest,
@@ -37,25 +37,44 @@ def create_exam(
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
-    # Tarihleri UTC'ye çevir
-    exam = Exam(
-        title=request.title,
-        registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC),
-        registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC),
-        exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
-        exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None
-    )
-
-    # Tarih kontrolü
-    if exam.registration_end_date > exam.exam_start_date:
-        raise HTTPException(
-            status_code=400,
-            detail="Başvuru bitiş tarihi sınav başlangıç tarihinden sonra olamaz"
+    try:
+        # Tarihleri UTC'ye çevir
+        exam = Exam(
+            title=request.title,
+            registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC),
+            registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC),
+            exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
+            exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
+            status='registration_pending'  # Başlangıç durumu
         )
 
-    db.add(exam)
-    db.commit()
-    return {"message": "Sınav oluşturuldu", "exam_id": exam.id}
+        # Tarih kontrolü
+        if exam.registration_end_date > exam.exam_start_date:
+            raise HTTPException(
+                status_code=400,
+                detail="Başvuru bitiş tarihi sınav başlangıç tarihinden sonra olamaz"
+            )
+
+        db.add(exam)
+        db.commit()
+        db.refresh(exam)
+
+        # Otomatik işlemleri zamanla
+        schedule_exam_events(
+            exam_id=exam.id,
+            registration_start=exam.registration_start_date,
+            registration_end=exam.registration_end_date,
+            exam_start=exam.exam_start_date,
+            exam_end=exam.exam_end_date if exam.exam_end_date else exam.exam_start_date
+        )
+
+        return {
+            "message": "Sınav oluşturuldu ve zamanlandı",
+            "exam_id": exam.id
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
@@ -153,7 +172,6 @@ async def publish_exam(
     db.commit()
     db.refresh(exam)
 
-    # Prepare questions with options
     questions_with_options = []
     for question in exam.questions:
         options = [question.option_1, question.option_2, question.option_3, question.option_4, question.option_5]

@@ -13,6 +13,7 @@ class Exam(Base):
     registration_end_date = Column(DateTime(timezone=True), nullable=True)
     exam_start_date = Column(DateTime(timezone=True), nullable=True)
     exam_end_date = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(50), default="registration_pending")
 
     questions = relationship("Question", back_populates="exam")
     exam_results = relationship("ExamResult", back_populates="exam")

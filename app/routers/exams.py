@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult, QuestionResultDetail, ExamListResponse, ExamStatus
+from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult, QuestionResultDetail, ExamListResponse
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult, Answer, ExamRegistration
 from app.routers.auth import get_current_user
@@ -20,16 +20,11 @@ def get_exams(
     db: Session = Depends(get_db)
 ):
     try:
-        # Timezone'suz datetime kullanımı
-        current_time = datetime.utcnow()  # datetime.now(pytz.UTC) yerine
-
         if current_user.role == "admin":
             exams = db.query(Exam).all()
         else:
             exams = db.query(Exam).filter(
-                Exam.is_published == True,
-                Exam.registration_start_date <= current_time,
-                Exam.registration_end_date >= current_time
+                Exam.status.in_(['registration_open', 'exam_active'])
             ).all()
 
         return [
@@ -40,31 +35,15 @@ def get_exams(
                 "registration_end_date": exam.registration_end_date,
                 "exam_start_date": exam.exam_start_date,
                 "exam_end_date": exam.exam_end_date,
-                "can_register": check_registration_available(exam, current_time),
-                "status": get_exam_status(exam, current_time)
+                "can_register": exam.status == 'registration_open',  # Değiştirildi
+                "status": exam.status  # Değiştirildi
             }
             for exam in exams
         ]
     except Exception as e:
-        print(f"Error in get_exams: {str(e)}")  # Hata ayıklama için
+        print(f"Error in get_exams: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-def check_registration_available(exam: Exam, current_time: datetime) -> bool:
-    return (exam.is_published and
-            exam.registration_start_date <= current_time <= exam.registration_end_date)
-
-def get_exam_status(exam: Exam, current_time: datetime) -> str:
-    if not exam.is_published:
-        return "unpublished"
-    if current_time < exam.registration_start_date:
-        return "registration_pending"
-    if current_time <= exam.registration_end_date:
-        return "registration_open"
-    if current_time < exam.exam_start_date:
-        return "registration_closed"
-    if current_time <= exam.exam_end_date:
-        return "exam_active"
-    return "completed"
 
 
 @router.get("/exams/{exam_id}")
@@ -76,8 +55,6 @@ def get_exam(
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Sınav bulunamadı")
-
-    current_time = datetime.utcnow()
 
     # Admin değilse kontrolleri yap
     if current_user.role != "admin":
@@ -93,20 +70,13 @@ def get_exam(
                 detail="Bu sınava erişmek için kayıt olmalısınız"
             )
 
-        # Sınav zamanı kontrolü
-        if current_time < exam.exam_start_date:
+        # Sınav durumu kontrolü
+        if exam.status != 'exam_active':
             raise HTTPException(
                 status_code=403,
-                detail=f"Bu sınav {exam.exam_start_date.strftime('%d.%m.%Y %H:%M')} tarihinde başlayacak"
+                detail="Sınav henüz başlamamış veya süresi dolmuş"
             )
 
-        if exam.exam_end_date and current_time > exam.exam_end_date:
-            raise HTTPException(
-                status_code=403,
-                detail="Bu sınavın süresi dolmuş"
-            )
-
-    # Mevcut get_exam mantığı devam eder...
     questions = []
     for question in exam.questions:
         options = [
@@ -129,6 +99,7 @@ def get_exam(
         "questions": questions
     }
 
+
 @router.post("/start-exam/{exam_id}")
 def start_exam(
         exam_id: int,
@@ -136,6 +107,18 @@ def start_exam(
         db: Session = Depends(get_db)
 ):
     try:
+        # Sınavı kontrol et
+        exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        if not exam:
+            raise HTTPException(status_code=404, detail="Sınav bulunamadı")
+
+        # Sınav durumu kontrolü
+        if exam.status != 'exam_active':
+            raise HTTPException(
+                status_code=403,
+                detail="Sınav henüz başlamamış veya süresi dolmuş"
+            )
+
         # Başvuru kontrolü
         registration = db.query(ExamRegistration).filter(
             ExamRegistration.user_id == current_user.id,
@@ -148,12 +131,7 @@ def start_exam(
                 detail="Bu sınavı başlatmak için önce kayıt olmalısınız"
             )
 
-        # Sınavın var olup olmadığını kontrol et
-        exam = db.query(Exam).filter(Exam.id == exam_id).first()
-        if not exam:
-            raise HTTPException(status_code=404, detail="Sınav bulunamadı")
-
-        # Kullanıcının bu sınavı daha önce başlatıp başlatmadığını kontrol et
+        # Mevcut sınav sonucu kontrolü
         existing_result = db.query(ExamResult).filter(
             ExamResult.user_id == current_user.id,
             ExamResult.exam_id == exam_id
@@ -161,13 +139,12 @@ def start_exam(
 
         if existing_result:
             # Sınav zaten başlatılmış, süre kontrolü yap
-            current_time = datetime.utcnow()  # datetime.now(pytz.UTC) yerine
+            current_time = datetime.utcnow()
             remaining_time = existing_result.end_time - current_time
 
             if remaining_time.total_seconds() <= 0:
                 raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
 
-            # Süre dolmamışsa kalan süreyi hesapla
             remaining_minutes = int(remaining_time.total_seconds() / 60)
 
             return {
@@ -178,8 +155,13 @@ def start_exam(
             }
 
         # Yeni sınav başlat
-        start_time = datetime.utcnow()  # datetime.now(pytz.UTC) yerine
-        end_time = start_time + timedelta(minutes=90)
+        start_time = datetime.utcnow()
+
+        # Sınav süresini hesapla (başlangıç ve bitiş arasındaki fark)
+        exam_duration = (exam.exam_end_date - exam.exam_start_date).total_seconds() / 60
+        exam_duration = int(exam_duration)  # Dakikaya çevir
+
+        end_time = start_time + timedelta(minutes=exam_duration)
 
         new_result = ExamResult(
             user_id=current_user.id,
@@ -198,7 +180,8 @@ def start_exam(
             "message": "Sınav başlatıldı",
             "start_time": start_time.isoformat(),
             "end_time": end_time.isoformat(),
-            "remaining_minutes": 90
+            "remaining_minutes": exam_duration,
+            "exam_duration": exam_duration  # Toplam sınav süresini de döndür
         }
 
     except Exception as e:
@@ -457,52 +440,35 @@ async def register_for_exam(
         db: Session = Depends(get_db)
 ):
     try:
-        print(f"Registration attempt - Exam ID: {exam_id}, User ID: {current_user.id}")  # Debug log
-        current_time = datetime.utcnow()
-
-        # Sınavın var olup olmadığını kontrol et
         exam = db.query(Exam).filter(Exam.id == exam_id).first()
         if not exam:
-            print(f"Exam not found: {exam_id}")  # Debug log
             raise HTTPException(status_code=404, detail="Sınav bulunamadı")
 
-        # Başvuru tarih kontrolü
-        if current_time < exam.registration_start_date:
-            print(
-                f"Registration not started yet. Current: {current_time}, Start: {exam.registration_start_date}")  # Debug log
+        # Status kontrolü
+        if exam.status != 'registration_open':
             raise HTTPException(
                 status_code=403,
-                detail=f"Sınav başvuruları {exam.registration_start_date.strftime('%d.%m.%Y %H:%M')} tarihinde başlayacak"
+                detail="Sınav başvuruları şu anda açık değil"
             )
 
-        if current_time > exam.registration_end_date:
-            print(f"Registration ended. Current: {current_time}, End: {exam.registration_end_date}")  # Debug log
-            raise HTTPException(
-                status_code=403,
-                detail=f"Sınav başvuruları {exam.registration_end_date.strftime('%d.%m.%Y %H:%M')} tarihinde sona erdi"
-            )
-
-        # Kullanıcının daha önce kaydolup olmadığını kontrol et
+        # Önceki kayıt kontrolü
         existing_registration = db.query(ExamRegistration).filter(
             ExamRegistration.user_id == current_user.id,
             ExamRegistration.exam_id == exam_id
         ).first()
 
         if existing_registration:
-            print(f"User already registered - User ID: {current_user.id}, Exam ID: {exam_id}")  # Debug log
             raise HTTPException(
                 status_code=400,
                 detail="Bu sınava zaten kayıt oldunuz"
             )
 
-        # Yeni kayıt oluştur
+        # Yeni kayıt
         registration = ExamRegistration(
             user_id=current_user.id,
             exam_id=exam_id,
-            registration_date=current_time
+            registration_date=datetime.utcnow()
         )
-
-        print(f"Creating new registration - User ID: {current_user.id}, Exam ID: {exam_id}")  # Debug log
 
         db.add(registration)
         db.commit()
@@ -515,6 +481,6 @@ async def register_for_exam(
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"Registration error: {str(e)}")  # Hata detayını görelim
+        print(f"Registration error: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
