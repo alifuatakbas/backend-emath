@@ -135,18 +135,19 @@ def start_exam(
         current_user: UserDB = Depends(get_current_user),
         db: Session = Depends(get_db)
 ):
-    # Başvuru kontrolü eklenmelidir
-    registration = db.query(ExamRegistration).filter(
-        ExamRegistration.user_id == current_user.id,
-        ExamRegistration.exam_id == exam_id
-    ).first()
-
-    if not registration and current_user.role != "admin":
-        raise HTTPException(
-            status_code=403,
-            detail="Bu sınavı başlatmak için önce kayıt olmalısınız"
-        )
     try:
+        # Başvuru kontrolü
+        registration = db.query(ExamRegistration).filter(
+            ExamRegistration.user_id == current_user.id,
+            ExamRegistration.exam_id == exam_id
+        ).first()
+
+        if not registration and current_user.role != "admin":
+            raise HTTPException(
+                status_code=403,
+                detail="Bu sınavı başlatmak için önce kayıt olmalısınız"
+            )
+
         # Sınavın var olup olmadığını kontrol et
         exam = db.query(Exam).filter(Exam.id == exam_id).first()
         if not exam:
@@ -160,7 +161,7 @@ def start_exam(
 
         if existing_result:
             # Sınav zaten başlatılmış, süre kontrolü yap
-            current_time = datetime.utcnow()
+            current_time = datetime.utcnow()  # datetime.now(pytz.UTC) yerine
             remaining_time = existing_result.end_time - current_time
 
             if remaining_time.total_seconds() <= 0:
@@ -177,12 +178,8 @@ def start_exam(
             }
 
         # Yeni sınav başlat
-        start_time = datetime.utcnow()
+        start_time = datetime.utcnow()  # datetime.now(pytz.UTC) yerine
         end_time = start_time + timedelta(minutes=90)
-
-        # Timezone'ları açıkça belirt
-        start_time = start_time.replace(tzinfo=pytz.UTC)
-        end_time = end_time.replace(tzinfo=pytz.UTC)
 
         new_result = ExamResult(
             user_id=current_user.id,
@@ -205,7 +202,7 @@ def start_exam(
         }
 
     except Exception as e:
-        print(f"Start exam error: {str(e)}")  # Hata ayıklama için
+        print(f"Start exam error: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Sınav başlatılırken bir hata oluştu: {str(e)}")
 
@@ -215,38 +212,46 @@ def get_exam_time_status(
     current_user: UserDB = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    exam_result = db.query(ExamResult).filter(
-        ExamResult.user_id == current_user.id,
-        ExamResult.exam_id == exam_id
-    ).first()
+    try:
+        exam_result = db.query(ExamResult).filter(
+            ExamResult.user_id == current_user.id,
+            ExamResult.exam_id == exam_id
+        ).first()
 
-    if not exam_result:
-        return {
-            "is_started": False,
-            "remaining_minutes": None,
-            "message": "Sınav henüz başlatılmamış"
-        }
+        if not exam_result:
+            return {
+                "is_started": False,
+                "remaining_minutes": None,
+                "message": "Sınav henüz başlatılmamış"
+            }
 
-    current_time = datetime.utcnow()
-    end_time = exam_result.end_time
+        # datetime.now(pytz.UTC) yerine datetime.utcnow() kullanıyoruz
+        current_time = datetime.utcnow()
+        end_time = exam_result.end_time
 
-    if current_time > end_time:
+        if current_time > end_time:
+            return {
+                "is_started": True,
+                "remaining_minutes": 0,
+                "message": "Sınav süresi dolmuş"
+            }
+
+        remaining_time = end_time - current_time
+        remaining_minutes = int(remaining_time.total_seconds() / 60)
+
         return {
             "is_started": True,
-            "remaining_minutes": 0,
-            "message": "Sınav süresi dolmuş"
+            "remaining_minutes": remaining_minutes,
+            "start_time": exam_result.start_time.isoformat(),
+            "end_time": exam_result.end_time.isoformat(),
+            "message": "Sınav devam ediyor"
         }
-
-    remaining_time = end_time - current_time
-    remaining_minutes = int(remaining_time.total_seconds() / 60)
-
-    return {
-        "is_started": True,
-        "remaining_minutes": remaining_minutes,
-        "start_time": exam_result.start_time.isoformat(),
-        "end_time": exam_result.end_time.isoformat(),
-        "message": "Sınav devam ediyor"
-    }
+    except Exception as e:
+        print(f"Error in get_exam_time_status: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Sınav süresi kontrol edilirken bir hata oluştu"
+        )
 
 
 @router.post("/submit-exam/{exam_id}", response_model=ExamResultResponse)
