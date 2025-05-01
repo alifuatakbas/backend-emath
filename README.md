@@ -7,5 +7,5 @@ Online matematik eğitim platformunun backend API servisi.
 - Python
 - FastAPI
 - SQLAlchemy
-- PostgreSQL
+- MYSQL
 - JWT Authentication
