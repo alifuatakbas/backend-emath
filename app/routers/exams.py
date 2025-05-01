@@ -27,19 +27,29 @@ def get_exams(
                 Exam.status.in_(['registration_open', 'exam_active'])
             ).all()
 
-        return [
-            {
+        exam_list = []
+        for exam in exams:
+            # Kayıt durumu kontrolü
+            registration = db.query(ExamRegistration).filter(
+                ExamRegistration.user_id == current_user.id,
+                ExamRegistration.exam_id == exam.id
+            ).first()
+
+            exam_data = {
                 "id": exam.id,
                 "title": exam.title,
                 "registration_start_date": exam.registration_start_date,
                 "registration_end_date": exam.registration_end_date,
                 "exam_start_date": exam.exam_start_date,
                 "exam_end_date": exam.exam_end_date,
-                "can_register": exam.status == 'registration_open',  # Değiştirildi
-                "status": exam.status  # Değiştirildi
+                "can_register": exam.status == 'registration_open' and not registration,
+                "status": exam.status,
+                "is_registered": bool(registration),
+                "registration_status": "Sınav başlama tarihi bekleniyor" if registration else "Kayıt ol"
             }
-            for exam in exams
-        ]
+            exam_list.append(exam_data)
+
+        return exam_list
     except Exception as e:
         print(f"Error in get_exams: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -254,6 +264,14 @@ def submit_exam(
         if not existing_result:
             raise HTTPException(status_code=400, detail="Sınav henüz başlatılmamış")
 
+            # Süre kontrolü
+        current_time = datetime.utcnow()
+        if current_time > existing_result.end_time:
+                raise HTTPException(status_code=400, detail="Sınav süresi dolmuş")
+
+        if existing_result.completed:
+                raise HTTPException(status_code=400, detail="Bu sınav zaten tamamlanmış")
+
         # Sınavın tüm sorularını al
         exam_questions = db.query(Question).filter(Question.exam_id == exam_id).all()
         questions_dict = {q.id: q for q in exam_questions}
@@ -297,7 +315,7 @@ def submit_exam(
         existing_result.correct_answers = correct_count
         existing_result.incorrect_answers = incorrect_count
         existing_result.completed = True  # Sınavı tamamlandı olarak işaretle
-
+        existing_result.auto_completed = False
         # Soru detaylarını al
         questions_with_answers = []
         for question in exam_questions:

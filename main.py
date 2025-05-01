@@ -1,9 +1,9 @@
 from fastapi import FastAPI, HTTPException
 from app.routers import auth, exams, admin_exams
-from database import engine, Base
+from database import engine, Base, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.services.schedular import init_scheduler, shutdown_scheduler
+from app.services.schedular import init_scheduler, shutdown_scheduler, auto_complete_exams
 import os
 
 try:
@@ -19,8 +19,15 @@ app = FastAPI()
 @app.on_event("startup")
 async def startup_event():
     try:
-        init_scheduler()
-        print("Scheduler başarıyla başlatıldı")
+        scheduler = init_scheduler()  # Tek çağrı
+        scheduler.add_job(
+            auto_complete_exams,
+            'interval',
+            minutes=1,
+            args=[SessionLocal()],
+            id='auto_complete_exams'
+        )
+        print("Scheduler ve auto-complete job başarıyla başlatıldı")
     except Exception as e:
         print(f"Scheduler başlatılırken hata oluştu: {e}")
 

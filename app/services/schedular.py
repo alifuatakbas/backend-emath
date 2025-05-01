@@ -3,6 +3,53 @@ from sqlalchemy import Column, Integer, DateTime, Boolean, ForeignKey, String
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.models.exam import Exam
 from database import Base, SessionLocal
+from datetime import datetime
+from sqlalchemy.orm import Session
+from app.models.exam import Exam, ExamResult, Answer
+from database import get_db
+
+
+async def auto_complete_exams(db: Session):
+    try:
+        current_time = datetime.utcnow()
+
+        # Süresi dolan aktif sınavları bul
+        active_results = db.query(ExamResult).join(Exam).filter(
+            Exam.status == 'exam_active',
+            ExamResult.completed == False,
+            ExamResult.end_time <= current_time
+        ).all()
+
+        print(f"Found {len(active_results)} exams to auto-complete")
+
+        for result in active_results:
+            try:
+                # Mevcut cevapları al
+                answers = db.query(Answer).filter(
+                    Answer.exam_result_id == result.id
+                ).all()
+
+                # Sonuçları hesapla
+                correct_count = sum(1 for a in answers if a.is_correct)
+                incorrect_count = len(answers) - correct_count
+
+                # Sonucu güncelle
+                result.completed = True
+                result.correct_answers = correct_count
+                result.incorrect_answers = incorrect_count
+                result.auto_completed = True  # Otomatik tamamlandığını belirt
+
+                db.commit()
+                print(f"Auto-completed exam result {result.id} for user {result.user_id}")
+
+            except Exception as e:
+                print(f"Error auto-completing exam result {result.id}: {str(e)}")
+                db.rollback()
+
+    except Exception as e:
+        print(f"Error in auto_complete_exams: {str(e)}")
+
+
 
 
 # ExamSession Model
@@ -147,6 +194,7 @@ def get_exam_status(exam, current_time: datetime = None) -> str:
         return "exam_active"
 
     return "completed"
+
 
 
 def init_scheduler():

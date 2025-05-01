@@ -48,6 +48,8 @@ class ExamResult(Base):
     exam_id = Column(Integer, ForeignKey("exams.id"))
     correct_answers = Column(Integer, default=0)
     incorrect_answers = Column(Integer, default=0)
+    auto_completed = Column(Boolean, default=False)
+    completed = Column(Boolean, default=False)  # Eksik alan
 
     # DateTime kolonlarını açıkça tanımlayalım
     start_time = Column(DateTime(timezone=True), nullable=False)

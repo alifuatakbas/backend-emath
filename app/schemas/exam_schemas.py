@@ -17,9 +17,11 @@ class ExamListResponse(BaseModel):
     registration_start_date: datetime
     registration_end_date: datetime
     exam_start_date: datetime
-    exam_end_date: Optional[datetime] = None
+    exam_end_date: datetime
     can_register: bool
-    status: ExamStatus
+    status: str
+    is_registered: bool
+    registration_status: str
 
     class Config:
         from_attributes = True
