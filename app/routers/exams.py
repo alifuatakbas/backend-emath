@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult, QuestionResultDetail, ExamListResponse
+from app.schemas.exam_schemas import ExamSubmission, ExamResultResponse, ExamWithResult, QuestionResultDetail, ExamListResponse, ExamStatus
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult, Answer, ExamRegistration
 from app.routers.auth import get_current_user
@@ -19,32 +19,34 @@ def get_exams(
     current_user: UserDB = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    current_time = datetime.now(pytz.UTC)
+    try:
+        current_time = datetime.now(pytz.UTC)
 
-    if current_user.role == "admin":
-        # Admin tüm sınavları görebilir
-        exams = db.query(Exam).all()
-    else:
-        # Normal kullanıcı için yayınlanmış ve başvurusu açık olan sınavları göster
-        exams = db.query(Exam).filter(
-            Exam.is_published == True,
-            Exam.registration_start_date <= current_time,
-            Exam.registration_end_date >= current_time
-        ).all()
+        if current_user.role == "admin":
+            exams = db.query(Exam).all()
+        else:
+            exams = db.query(Exam).filter(
+                Exam.is_published == True,
+                Exam.registration_start_date <= current_time,
+                Exam.registration_end_date >= current_time
+            ).all()
 
-    return [
-        {
-            "id": exam.id,
-            "title": exam.title,
-            "registration_start_date": exam.registration_start_date,
-            "registration_end_date": exam.registration_end_date,
-            "exam_start_date": exam.exam_start_date,
-            "exam_end_date": exam.exam_end_date,
-            "can_register": check_registration_available(exam, current_time),
-            "status": get_exam_status(exam, current_time)
-        }
-        for exam in exams
-    ]
+        return [
+            {
+                "id": exam.id,
+                "title": exam.title,
+                "registration_start_date": exam.registration_start_date,
+                "registration_end_date": exam.registration_end_date,
+                "exam_start_date": exam.exam_start_date,
+                "exam_end_date": exam.exam_end_date,
+                "can_register": check_registration_available(exam, current_time),
+                "status": ExamStatus(get_exam_status(exam, current_time))  # Enum'a dönüştürme
+            }
+            for exam in exams
+        ]
+    except Exception as e:
+        print(f"Error in get_exams: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def check_registration_available(exam: Exam, current_time: datetime) -> bool:
     return (exam.is_published and
