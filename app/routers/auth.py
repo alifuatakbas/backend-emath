@@ -116,47 +116,35 @@ async def read_users_me(current_user: UserDB = Depends(get_current_user)):  # Us
 # Şifremi unuttum endpoint'i
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    logger.info(f"Received forgot password request for email: {request.email}")
+
+    # 1. Email formatını kontrol et
+    if not request.email:
+        logger.error("Email is empty")
+        raise HTTPException(status_code=400, detail="Email adresi gerekli")
+
+    # 2. Kullanıcıyı kontrol et
+    user = db.query(UserDB).filter(UserDB.email == request.email).first()
+    if not user:
+        logger.warning(f"User not found: {request.email}")
+        raise HTTPException(status_code=404, detail="Bu email ile kayıtlı kullanıcı bulunamadı")
+
     try:
-        # Debug için gelen isteği logla
-        logger.info(f"Received forgot password request for email: {request.email}")
-
-        user = db.query(UserDB).filter(UserDB.email == request.email).first()
-        if not user:
-            logger.warning(f"User not found for email: {request.email}")
-            raise HTTPException(
-                status_code=404,
-                detail="Bu email adresi ile kayıtlı kullanıcı bulunamadı"
-            )
-
-        # Reset token oluştur
+        # 3. Token oluştur
         token_data = {
             "sub": user.email,
             "exp": datetime.utcnow() + timedelta(minutes=30)
         }
+        reset_token = jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-        try:
-            reset_token = jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-            logger.info(f"Reset token created for user: {user.email}")
-        except Exception as e:
-            logger.error(f"Error creating reset token: {str(e)}")
-            raise HTTPException(status_code=500, detail="Token oluşturma hatası")
+        # 4. Email gönder
+        await send_reset_email(user.email, reset_token)
 
-        try:
-            # Email gönder
-            await send_reset_email(user.email, reset_token)
-            logger.info(f"Reset email sent successfully to: {user.email}")
-        except Exception as e:
-            logger.error(f"Error sending reset email: {str(e)}")
-            raise HTTPException(status_code=500, detail="Email gönderme hatası")
-
+        logger.info(f"Password reset email sent successfully to {user.email}")
         return {"message": "Şifre sıfırlama linki email adresinize gönderildi"}
 
-    except HTTPException as he:
-        # HTTP hataları olduğu gibi yükselt
-        raise he
     except Exception as e:
-        # Beklenmeyen hataları logla
-        logger.error(f"Unexpected error in forgot_password: {str(e)}")
+        logger.error(f"Error in forgot_password: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Şifre sıfırlama işlemi sırasında bir hata oluştu"
