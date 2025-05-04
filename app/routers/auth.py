@@ -154,25 +154,50 @@ async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(
 @router.post("/reset-password")
 async def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
     try:
-        # Token'ı doğrula (burada da SECRET_KEY'i doğrudan kullan)
-        payload = jwt.decode(request.token, SECRET_KEY, algorithms=["HS256"])
-        email = payload.get("sub")
+        logger.info("Şifre sıfırlama isteği başladı")
+
+        try:
+            payload = jwt.decode(request.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            email = payload.get("sub")
+            if not email:
+                logger.error("Token'da email bilgisi bulunamadı")
+                raise HTTPException(status_code=400, detail="Geçersiz token formatı")
+
+            logger.info(f"Token doğrulandı, email: {email}")
+
+        except jwt.ExpiredSignatureError:
+            logger.warning("Token süresi dolmuş")
+            raise HTTPException(status_code=400, detail="Token süresi dolmuş")
+        except jwt.JWTError as e:
+            logger.error(f"Token doğrulama hatası: {str(e)}")
+            raise HTTPException(status_code=400, detail="Geçersiz token")
 
         user = db.query(UserDB).filter(UserDB.email == email).first()
         if not user:
+            logger.warning(f"Kullanıcı bulunamadı: {email}")
             raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
 
-        # Yeni şifreyi hashle ve kaydet
-        hashed_password = get_password_hash(request.new_password)
-        user.hashed_password = hashed_password
-        db.commit()
+        try:
+            hashed_password = get_password_hash(request.new_password)
+            user.hashed_password = hashed_password
+            db.commit()
+            logger.info(f"Şifre başarıyla güncellendi: {email}")
+        except Exception as e:
+            logger.error(f"Şifre güncelleme hatası: {str(e)}")
+            db.rollback()
+            raise HTTPException(status_code=500, detail="Şifre güncellenirken bir hata oluştu")
 
         return {"message": "Şifreniz başarıyla güncellendi"}
 
-    except jwt.JWTError:
+    except HTTPException as he:
+        # HTTP hatalarını olduğu gibi yükselt
+        raise he
+    except Exception as e:
+        # Beklenmeyen hataları logla
+        logger.error(f"Beklenmeyen hata: {str(e)}")
         raise HTTPException(
-            status_code=400,
-            detail="Geçersiz veya süresi dolmuş token"
+            status_code=500,
+            detail="Şifre sıfırlama işlemi sırasında bir hata oluştu"
         )
 
 
