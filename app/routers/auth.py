@@ -20,6 +20,23 @@ from sqlalchemy.orm import Session
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pathlib import Path
 from config import settings
+# Logging ayarları
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# Kullanımı:
+logger.info("Bilgi mesajı")
+logger.error("Hata mesajı")
 
 
 current_dir = Path(__file__).parent.absolute()
@@ -99,25 +116,51 @@ async def read_users_me(current_user: UserDB = Depends(get_current_user)):  # Us
 # Şifremi unuttum endpoint'i
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
-    user = db.query(UserDB).filter(UserDB.email == request.email).first()
-    if not user:
+    try:
+        # Debug için gelen isteği logla
+        logger.info(f"Received forgot password request for email: {request.email}")
+
+        user = db.query(UserDB).filter(UserDB.email == request.email).first()
+        if not user:
+            logger.warning(f"User not found for email: {request.email}")
+            raise HTTPException(
+                status_code=404,
+                detail="Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+            )
+
+        # Reset token oluştur
+        token_data = {
+            "sub": user.email,
+            "exp": datetime.utcnow() + timedelta(minutes=30)
+        }
+
+        try:
+            reset_token = jwt.encode(token_data, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+            logger.info(f"Reset token created for user: {user.email}")
+        except Exception as e:
+            logger.error(f"Error creating reset token: {str(e)}")
+            raise HTTPException(status_code=500, detail="Token oluşturma hatası")
+
+        try:
+            # Email gönder
+            await send_reset_email(user.email, reset_token)
+            logger.info(f"Reset email sent successfully to: {user.email}")
+        except Exception as e:
+            logger.error(f"Error sending reset email: {str(e)}")
+            raise HTTPException(status_code=500, detail="Email gönderme hatası")
+
+        return {"message": "Şifre sıfırlama linki email adresinize gönderildi"}
+
+    except HTTPException as he:
+        # HTTP hataları olduğu gibi yükselt
+        raise he
+    except Exception as e:
+        # Beklenmeyen hataları logla
+        logger.error(f"Unexpected error in forgot_password: {str(e)}")
         raise HTTPException(
-            status_code=404,
-            detail="Bu email adresi ile kayıtlı kullanıcı bulunamadı"
+            status_code=500,
+            detail="Şifre sıfırlama işlemi sırasında bir hata oluştu"
         )
-
-    # Reset token oluştur
-    token_data = {
-        "sub": user.email,
-        "exp": datetime.utcnow() + timedelta(minutes=30)
-    }
-    # os.getenv yerine doğrudan SECRET_KEY kullan
-    reset_token = jwt.encode(token_data, SECRET_KEY, algorithm="HS256")
-
-    # Email gönder
-    await send_reset_email(user.email, reset_token)
-
-    return {"message": "Şifre sıfırlama linki email adresinize gönderildi"}
 
 
 @router.post("/reset-password")
