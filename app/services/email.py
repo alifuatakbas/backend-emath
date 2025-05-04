@@ -51,7 +51,7 @@ except Exception as e:
     logger.error(f"Error creating email configuration: {str(e)}")
     raise
 
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://e-math-frontend.vercel.app')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://eolimpiyat.com')
 logger.info(f"Frontend URL: {FRONTEND_URL}")
 
 async def send_reset_email(email: EmailStr, token: str):
