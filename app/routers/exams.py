@@ -506,7 +506,7 @@ async def register_for_exam(
 
 @router.get("/exams/active")
 def get_active_exams(
-        db: Session = Depends(get_db)
+    db: Session = Depends(get_db)
 ):
     try:
         current_time = datetime.utcnow()
