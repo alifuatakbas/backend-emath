@@ -508,7 +508,7 @@ def get_active_exams(
     db: Session = Depends(get_db)
 ):
     try:
-        # Sadece kayıt açık olan ve aktif sınavları getir
+        # Authentication kontrolünü kaldırdık
         exams = db.query(Exam).filter(
             Exam.status.in_(['registration_open', 'exam_active'])
         ).all()
