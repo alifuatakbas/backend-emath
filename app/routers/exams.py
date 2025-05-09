@@ -503,14 +503,17 @@ async def register_for_exam(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/exams/active")
 def get_active_exams(
-    db: Session = Depends(get_db)
+        db: Session = Depends(get_db)
 ):
     try:
-        # Authentication kontrolünü kaldırdık
+        current_time = datetime.utcnow()
+
+        # Sınav başlangıç tarihi gelmemiş tüm sınavları getir
         exams = db.query(Exam).filter(
-            Exam.status.in_(['registration_open', 'exam_active'])
+            Exam.exam_start_date > current_time
         ).all()
 
         exam_list = []
