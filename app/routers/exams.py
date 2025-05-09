@@ -502,3 +502,31 @@ async def register_for_exam(
         print(f"Registration error: {str(e)}")
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/exams/active")
+def get_active_exams(
+    db: Session = Depends(get_db)
+):
+    try:
+        # Sadece kayıt açık olan ve aktif sınavları getir
+        exams = db.query(Exam).filter(
+            Exam.status.in_(['registration_open', 'exam_active'])
+        ).all()
+
+        exam_list = []
+        for exam in exams:
+            exam_data = {
+                "id": exam.id,
+                "title": exam.title,
+                "registration_start_date": exam.registration_start_date,
+                "registration_end_date": exam.registration_end_date,
+                "exam_start_date": exam.exam_start_date,
+                "exam_end_date": exam.exam_end_date,
+                "status": exam.status
+            }
+            exam_list.append(exam_data)
+
+        return exam_list
+    except Exception as e:
+        print(f"Error in get_active_exams: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
