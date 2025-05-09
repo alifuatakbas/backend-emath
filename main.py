@@ -5,6 +5,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.services.schedular import init_scheduler, shutdown_scheduler, auto_complete_exams
 import os
+from datetime import datetime
+from app.models.exam import Exam
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from database import get_db
 
 try:
     Base.metadata.create_all(bind=engine)  # MySQL'e bağlanarak tabloları oluşturur
@@ -62,3 +67,32 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@app.get("/exams/active", include_in_schema=True)
+async def get_active_exams_public(
+    db: Session = Depends(get_db)
+):
+    try:
+        current_time = datetime.utcnow()
+        exams = db.query(Exam).filter(
+            Exam.exam_start_date > current_time
+        ).all()
+
+        exam_list = []
+        for exam in exams:
+            exam_data = {
+                "id": exam.id,
+                "title": exam.title,
+                "registration_start_date": exam.registration_start_date,
+                "registration_end_date": exam.registration_end_date,
+                "exam_start_date": exam.exam_start_date,
+                "exam_end_date": exam.exam_end_date,
+                "status": exam.status
+            }
+            exam_list.append(exam_data)
+
+        return exam_list
+    except Exception as e:
+        print(f"Error in get_active_exams: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
