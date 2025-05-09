@@ -59,6 +59,7 @@ class ExamCreateRequest(BaseModel):
     registration_end_date: datetime
     exam_start_date: datetime
     exam_end_date: Optional[datetime] = None
+    duration_minutes: int  # Yeni eklenen alan
 
 class QuestionSCH(BaseModel):
     id: int
