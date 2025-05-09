@@ -504,3 +504,36 @@ async def register_for_exam(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/public/exams", response_model=List[ExamListResponse])
+def get_public_exams(
+        db: Session = Depends(get_db)
+):
+    try:
+        current_time = datetime.utcnow()
+
+        # Tüm sınavları getir
+        exams = db.query(Exam).filter(
+            Exam.status != 'completed',  # Tamamlanmış sınavları hariç tut
+            Exam.exam_start_date > current_time  # Sınav başlangıç tarihi gelmemiş olanları getir
+        ).all()
+
+        exam_list = []
+        for exam in exams:
+            exam_data = {
+                "id": exam.id,
+                "title": exam.title,
+                "registration_start_date": exam.registration_start_date,
+                "registration_end_date": exam.registration_end_date,
+                "exam_start_date": exam.exam_start_date,
+                "exam_end_date": exam.exam_end_date,
+                "can_register": exam.status == 'registration_open',
+                "status": exam.status,
+                "is_registered": False,  # Giriş yapmamış kullanıcı için her zaman False
+                "registration_status": "Giriş yaparak kayıt olabilirsiniz"
+            }
+            exam_list.append(exam_data)
+
+        return exam_list
+    except Exception as e:
+        print(f"Error in get_public_exams: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
