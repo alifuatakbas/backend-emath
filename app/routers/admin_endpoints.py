@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
 from app.models.exam import Exam, Question, ExamResult, Answer
 from app.models.user import UserDB
 from app.routers.auth import get_current_user
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -26,6 +26,14 @@ class ExamResultWithUser(BaseModel):
         from_attributes = True
 
 
+class PaginatedResults(BaseModel):
+    results: List[ExamResultWithUser]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class AnswerDetail(BaseModel):
     id: int
     question_id: int
@@ -37,27 +45,54 @@ class AnswerDetail(BaseModel):
         from_attributes = True
 
 
-@router.get("/exam-results", response_model=List[ExamResultWithUser])
-async def get_all_exam_results(
-        current_user: UserDB = Depends(get_current_user),
-        db: Session = Depends(get_db)
+@router.get("/paginated-exam-results", response_model=PaginatedResults)
+async def pagi_get_exam_results(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    grade: Optional[str] = None,
+    exam_id: Optional[int] = None,
+    search: Optional[str] = None,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Tüm sınav sonuçlarını getir (sadece admin)"""
+    """Filtreli ve sayfalı sınav sonuçları (sadece admin)"""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
     try:
-        # Tüm sınav sonuçlarını kullanıcı ve sınav bilgileriyle birlikte getir
+        # Base query
+        query = db.query(ExamResult).join(UserDB, ExamResult.user_id == UserDB.id).join(Exam, ExamResult.exam_id == Exam.id)
+
+        # Filtreler
+        if grade:
+            query = query.filter(UserDB.branch == grade)
+        if exam_id:
+            query = query.filter(ExamResult.exam_id == exam_id)
+        if search:
+            like = f"%{search}%"
+            query = query.filter(
+                (UserDB.full_name.ilike(like)) |
+                (UserDB.email.ilike(like)) |
+                (UserDB.school_name.ilike(like))
+            )
+
+        # Toplam kayıt sayısı
+        total = query.count()
+        total_pages = (total + page_size - 1) // page_size
+
+        # Sayfalama
+        offset = (page - 1) * page_size
         results = (
-            db.query(ExamResult)
-            .join(UserDB, ExamResult.user_id == UserDB.id)
-            .join(Exam, ExamResult.exam_id == Exam.id)
+            query
+            .order_by(ExamResult.id.desc())
+            .offset(offset)
+            .limit(page_size)
             .all()
         )
 
+        # Veriyi hazırla
         exam_results = []
         for result in results:
-            # Kullanıcı bilgilerini hazırla
             user_data = {
                 "id": result.user.id,
                 "full_name": result.user.full_name,
@@ -67,7 +102,6 @@ async def get_all_exam_results(
                 "role": result.user.role
             }
 
-            # Sınav bilgilerini hazırla
             exam_data = {
                 "id": result.exam.id,
                 "title": result.exam.title
@@ -86,7 +120,13 @@ async def get_all_exam_results(
                 exam=exam_data
             ))
 
-        return exam_results
+        return PaginatedResults(
+            results=exam_results,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Veri getirilirken hata oluştu: {str(e)}")
@@ -144,175 +184,6 @@ async def get_exam_result_answers(
         raise HTTPException(status_code=500, detail=f"Cevap detayları getirilirken hata oluştu: {str(e)}")
 
 
-@router.get("/exam-results/grade/{grade}")
-async def get_exam_results_by_grade(
-        grade: str,
-        current_user: UserDB = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    """Belirli bir sınıfın sınav sonuçlarını getir (sadece admin)"""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Yetkiniz yok")
-
-    try:
-        # Belirli sınıftaki öğrencilerin sınav sonuçlarını getir
-        results = (
-            db.query(ExamResult)
-            .join(UserDB, ExamResult.user_id == UserDB.id)
-            .join(Exam, ExamResult.exam_id == Exam.id)
-            .filter(UserDB.branch == grade)
-            .all()
-        )
-
-        exam_results = []
-        for result in results:
-            user_data = {
-                "id": result.user.id,
-                "full_name": result.user.full_name,
-                "email": result.user.email,
-                "school_name": result.user.school_name,
-                "branch": result.user.branch,
-                "role": result.user.role
-            }
-
-            exam_data = {
-                "id": result.exam.id,
-                "title": result.exam.title
-            }
-
-            exam_results.append(ExamResultWithUser(
-                id=result.id,
-                user_id=result.user_id,
-                exam_id=result.exam_id,
-                correct_answers=result.correct_answers,
-                incorrect_answers=result.incorrect_answers,
-                completed=result.completed,
-                start_time=result.start_time.isoformat(),
-                end_time=result.end_time.isoformat(),
-                user=user_data,
-                exam=exam_data
-            ))
-
-        return exam_results
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sınıf sonuçları getirilirken hata oluştu: {str(e)}")
-
-
-@router.get("/exam-results/exam/{exam_id}")
-async def get_exam_results_by_exam(
-        exam_id: int,
-        current_user: UserDB = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    """Belirli bir sınavın sonuçlarını getir (sadece admin)"""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Yetkiniz yok")
-
-    try:
-        # Belirli sınavın sonuçlarını getir
-        results = (
-            db.query(ExamResult)
-            .join(UserDB, ExamResult.user_id == UserDB.id)
-            .join(Exam, ExamResult.exam_id == Exam.id)
-            .filter(ExamResult.exam_id == exam_id)
-            .all()
-        )
-
-        exam_results = []
-        for result in results:
-            user_data = {
-                "id": result.user.id,
-                "full_name": result.user.full_name,
-                "email": result.user.email,
-                "school_name": result.user.school_name,
-                "branch": result.user.branch,
-                "role": result.user.role
-            }
-
-            exam_data = {
-                "id": result.exam.id,
-                "title": result.exam.title
-            }
-
-            exam_results.append(ExamResultWithUser(
-                id=result.id,
-                user_id=result.user_id,
-                exam_id=result.exam_id,
-                correct_answers=result.correct_answers,
-                incorrect_answers=result.incorrect_answers,
-                completed=result.completed,
-                start_time=result.start_time.isoformat(),
-                end_time=result.end_time.isoformat(),
-                user=user_data,
-                exam=exam_data
-            ))
-
-        return exam_results
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Sınav sonuçları getirilirken hata oluştu: {str(e)}")
-
-
-@router.get("/exam-results/search/{search_term}")
-async def search_exam_results(
-        search_term: str,
-        current_user: UserDB = Depends(get_current_user),
-        db: Session = Depends(get_db)
-):
-    """Öğrenci adı, email veya okul adına göre sınav sonuçlarını ara (sadece admin)"""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Yetkiniz yok")
-
-    try:
-        # Arama terimine göre sonuçları getir
-        results = (
-            db.query(ExamResult)
-            .join(UserDB, ExamResult.user_id == UserDB.id)
-            .join(Exam, ExamResult.exam_id == Exam.id)
-            .filter(
-                (UserDB.full_name.ilike(f"%{search_term}%")) |
-                (UserDB.email.ilike(f"%{search_term}%")) |
-                (UserDB.school_name.ilike(f"%{search_term}%"))
-            )
-            .all()
-        )
-
-        exam_results = []
-        for result in results:
-            user_data = {
-                "id": result.user.id,
-                "full_name": result.user.full_name,
-                "email": result.user.email,
-                "school_name": result.user.school_name,
-                "branch": result.user.branch,
-                "role": result.user.role
-            }
-
-            exam_data = {
-                "id": result.exam.id,
-                "title": result.exam.title
-            }
-
-            exam_results.append(ExamResultWithUser(
-                id=result.id,
-                user_id=result.user_id,
-                exam_id=result.exam_id,
-                correct_answers=result.correct_answers,
-                incorrect_answers=result.incorrect_answers,
-                completed=result.completed,
-                start_time=result.start_time.isoformat(),
-                end_time=result.end_time.isoformat(),
-                user=user_data,
-                exam=exam_data
-            ))
-
-        return exam_results
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Arama sonuçları getirilirken hata oluştu: {str(e)}")
-
-
 @router.get("/exam-results/stats/summary")
 async def get_exam_results_summary(
         current_user: UserDB = Depends(get_current_user),
@@ -337,7 +208,7 @@ async def get_exam_results_summary(
 
         # Sınıf bazında istatistikler
         grade_stats = {}
-        for grade in ['3', '4', '5', '6', '7']:
+        for grade in ['3. Sınıf', '4. Sınıf', '5. Sınıf', '6. Sınıf', '7. Sınıf', '8. Sınıf', '9. Sınıf']:
             grade_results = (
                 db.query(ExamResult)
                 .join(UserDB, ExamResult.user_id == UserDB.id)
