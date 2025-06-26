@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from app.routers import auth, exams, admin_exams
+from app.routers import auth, exams, admin_exams, admin_endpoints
 from database import engine, Base, SessionLocal
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -43,6 +43,7 @@ async def shutdown_event():
 app.include_router(auth.router)
 app.include_router(exams.router)
 app.include_router(admin_exams.router)
+app.include_router(admin_endpoints.router)
 
 # CORS ayarları
 app.add_middleware(
