@@ -281,6 +281,11 @@ def init_scheduler():
             print(f"Mevcut sınavları kontrol ederken hata: {e}")
         finally:
             db.close()
+        
+        # Debug bilgilerini yazdır
+        print("=== SCHEDULER DEBUG ===")
+        debug_scheduler()
+        print("=== END DEBUG ===")
     
     return scheduler
 
@@ -310,3 +315,40 @@ ERROR_MESSAGES = {
     "update_failed": "Sınav durumu güncellenirken hata oluştu",
     "scheduling_failed": "Sınav zamanlama işlemi başarısız oldu"
 }
+
+def debug_scheduler():
+    """
+    Scheduler durumunu debug etmek için
+    """
+    print(f"Scheduler running: {scheduler.running}")
+    print(f"Total jobs: {len(scheduler.get_jobs())}")
+    
+    for job in scheduler.get_jobs():
+        print(f"Job ID: {job.id}")
+        print(f"  Function: {job.func.__name__}")
+        print(f"  Next run: {job.next_run_time}")
+        print(f"  Args: {job.args}")
+        print("---")
+    
+    # Mevcut sınavları kontrol et
+    db = SessionLocal()
+    try:
+        current_time = datetime.utcnow()
+        exams = db.query(Exam).all()
+        
+        print(f"Current time: {current_time}")
+        print(f"Total exams: {len(exams)}")
+        
+        for exam in exams:
+            print(f"Exam {exam.id}: {exam.title}")
+            print(f"  Status: {exam.status}")
+            print(f"  Requires registration: {exam.requires_registration}")
+            print(f"  Exam start: {exam.exam_start_date}")
+            print(f"  Exam end: {exam.exam_end_date}")
+            print(f"  Registration start: {exam.registration_start_date}")
+            print(f"  Registration end: {exam.registration_end_date}")
+            print("---")
+    except Exception as e:
+        print(f"Error in debug_scheduler: {e}")
+    finally:
+        db.close()

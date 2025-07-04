@@ -6,6 +6,8 @@ from app.models.user import UserDB
 from app.routers.auth import get_current_user
 from typing import List
 from pydantic import BaseModel
+from app.services.schedular import scheduler, debug_scheduler
+from datetime import datetime
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -363,3 +365,18 @@ async def get_exam_results_summary(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"İstatistikler getirilirken hata oluştu: {str(e)}")
+
+
+@router.get("/debug-scheduler")
+def debug_scheduler_endpoint(
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Yetkiniz yok")
+    
+    try:
+        debug_scheduler()
+        return {"message": "Debug bilgileri konsola yazdırıldı"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Debug hatası: {str(e)}")
