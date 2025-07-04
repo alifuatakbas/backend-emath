@@ -133,7 +133,7 @@ def get_exam(
     }
 
 
-router.post("/start-exam/{exam_id}")
+@router.post("/start-exam/{exam_id}")
 def start_exam(
         exam_id: int,
         current_user: UserDB = Depends(get_current_user),
