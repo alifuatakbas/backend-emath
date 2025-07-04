@@ -19,14 +19,7 @@ app = FastAPI()
 @app.on_event("startup")
 async def startup_event():
     try:
-        scheduler = init_scheduler()  # Tek çağrı
-        scheduler.add_job(
-            auto_complete_exams,
-            'interval',
-            minutes=1,
-            args=[SessionLocal()],
-            id='auto_complete_exams'
-        )
+        init_scheduler()  # Scheduler'ı başlat
         print("Scheduler ve auto-complete job başarıyla başlatıldı")
     except Exception as e:
         print(f"Scheduler başlatılırken hata oluştu: {e}")
