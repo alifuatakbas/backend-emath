@@ -129,13 +129,13 @@ async def get_exam_result_answers(
                 "option_3": answer.question.option_3,
                 "option_4": answer.question.option_4,
                 "option_5": answer.question.option_5,
-                "correct_option_id": answer.question.correct_option_id - 1  # 0-based index için -1
+                "correct_option_id": answer.question.correct_option_id + 1  # 1-based index için +1
             }
 
             answer_details.append(AnswerDetail(
                 id=answer.id,
                 question_id=answer.question_id,
-                selected_option=answer.selected_option - 1,  # 0-based index için -1
+                selected_option=answer.selected_option + 1,  # 1-based index için +1
                 is_correct=answer.is_correct,
                 question=question_data
             ))
