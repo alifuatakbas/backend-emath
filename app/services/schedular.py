@@ -221,6 +221,8 @@ def init_scheduler():
     """
     Uygulama başlangıcında scheduler'ı başlatır ve mevcut sınavları kontrol eder
     """
+    print("=== INIT SCHEDULER BAŞLADI ===")
+    
     if not scheduler.running:
         scheduler.start()
         print("Scheduler başlatıldı")
@@ -239,13 +241,24 @@ def init_scheduler():
         db = SessionLocal()
         try:
             current_time = datetime.utcnow()
+            print(f"Current time: {current_time}")
             exams = db.query(Exam).all()
+            print(f"Total exams found: {len(exams)}")
 
             for exam in exams:
+                print(f"Processing exam {exam.id}: {exam.title}")
+                print(f"  Status: {exam.status}")
+                print(f"  Requires registration: {exam.requires_registration}")
+                print(f"  Exam start: {exam.exam_start_date}")
+                print(f"  Exam end: {exam.exam_end_date}")
+                
                 # Sadece gelecekteki olayları zamanla
                 if exam.exam_end_date and exam.exam_end_date > current_time:
+                    print(f"  Exam {exam.id} has future events")
+                    
                     # Başvurusuz sınavlar için özel kontrol
                     if not exam.requires_registration:
+                        print(f"  Exam {exam.id} is no-registration exam")
                         # Başvurusuz sınavlar için sadece sınav başlangıç ve bitiş zamanlarını ayarla
                         if exam.exam_start_date and exam.exam_start_date > current_time:
                             scheduler.add_job(
@@ -256,7 +269,7 @@ def init_scheduler():
                                 id=f'exam_{exam.id}_start',
                                 replace_existing=True
                             )
-                            print(f"Başvurusuz sınav {exam.id} başlangıcı zamanlandı: {exam.exam_start_date}")
+                            print(f"  Başvurusuz sınav {exam.id} başlangıcı zamanlandı: {exam.exam_start_date}")
                         
                         if exam.exam_end_date and exam.exam_end_date > current_time:
                             scheduler.add_job(
@@ -267,8 +280,9 @@ def init_scheduler():
                                 id=f'exam_{exam.id}_end',
                                 replace_existing=True
                             )
-                            print(f"Başvurusuz sınav {exam.id} bitişi zamanlandı: {exam.exam_end_date}")
+                            print(f"  Başvurusuz sınav {exam.id} bitişi zamanlandı: {exam.exam_end_date}")
                     else:
+                        print(f"  Exam {exam.id} is registration exam")
                         # Normal başvurulu sınavlar için tüm zamanlamaları yap
                         schedule_exam_events(
                             exam_id=exam.id,
@@ -277,8 +291,12 @@ def init_scheduler():
                             exam_start=exam.exam_start_date,
                             exam_end=exam.exam_end_date
                         )
+                else:
+                    print(f"  Exam {exam.id} has no future events")
         except Exception as e:
             print(f"Mevcut sınavları kontrol ederken hata: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             db.close()
         
@@ -286,7 +304,10 @@ def init_scheduler():
         print("=== SCHEDULER DEBUG ===")
         debug_scheduler()
         print("=== END DEBUG ===")
+    else:
+        print("Scheduler zaten çalışıyor")
     
+    print("=== INIT SCHEDULER TAMAMLANDI ===")
     return scheduler
 
 

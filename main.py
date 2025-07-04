@@ -19,10 +19,15 @@ app = FastAPI()
 @app.on_event("startup")
 async def startup_event():
     try:
-        init_scheduler()  # Scheduler'ı başlat
-        print("Scheduler ve auto-complete job başarıyla başlatıldı")
+        print("=== STARTUP EVENT BAŞLADI ===")
+        scheduler = init_scheduler()  # Scheduler'ı başlat
+        print(f"Scheduler running: {scheduler.running}")
+        print(f"Total jobs: {len(scheduler.get_jobs())}")
+        print("=== STARTUP EVENT TAMAMLANDI ===")
     except Exception as e:
         print(f"Scheduler başlatılırken hata oluştu: {e}")
+        import traceback
+        traceback.print_exc()
 
 # Uygulama kapatıldığında scheduler'ı durdur
 @app.on_event("shutdown")
