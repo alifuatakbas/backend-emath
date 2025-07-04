@@ -23,9 +23,9 @@ s3_service = S3Service()
 
 class ExamCreateRequest(BaseModel):
     title: str
-    requires_registration: bool = True  # Bu satırı ekleyin
-    registration_start_date: datetime
-    registration_end_date: datetime
+    requires_registration: bool = True
+    registration_start_date: datetime | None = None
+    registration_end_date: datetime | None = None
     exam_start_date: datetime
     exam_end_date: datetime | None = None
 
