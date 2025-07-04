@@ -9,6 +9,7 @@ class Exam(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     is_published = Column(Boolean, default=False)
+    requires_registration = Column(Boolean, default=True)
     registration_start_date = Column(DateTime(timezone=True), nullable=True)
     registration_end_date = Column(DateTime(timezone=True), nullable=True)
     exam_start_date = Column(DateTime(timezone=True), nullable=True)

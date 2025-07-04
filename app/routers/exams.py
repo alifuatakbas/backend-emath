@@ -35,18 +35,36 @@ def get_exams(
                 ExamRegistration.exam_id == exam.id
             ).first()
 
-            exam_data = {
-                "id": exam.id,
-                "title": exam.title,
-                "registration_start_date": exam.registration_start_date,
-                "registration_end_date": exam.registration_end_date,
-                "exam_start_date": exam.exam_start_date,
-                "exam_end_date": exam.exam_end_date,
-                "can_register": exam.status == 'registration_open' and not registration,
-                "status": exam.status,
-                "is_registered": bool(registration),
-                "registration_status": "Sınav başlama tarihi bekleniyor" if registration else "Kayıt ol"
-            }
+            # Başvurusuz sınavlar için özel durum
+            if not exam.requires_registration:
+                exam_data = {
+                    "id": exam.id,
+                    "title": exam.title,
+                    "requires_registration": exam.requires_registration,
+                    "registration_start_date": exam.registration_start_date,
+                    "registration_end_date": exam.registration_end_date,
+                    "exam_start_date": exam.exam_start_date,
+                    "exam_end_date": exam.exam_end_date,
+                    "can_register": False,  # Başvurusuz sınavlarda başvuru yok
+                    "status": exam.status,
+                    "is_registered": True,  # Başvurusuz sınavlarda otomatik kayıtlı sayılır
+                    "registration_status": "Başvuru gerekmez"
+                }
+            else:
+                # Normal başvurulu sınavlar
+                exam_data = {
+                    "id": exam.id,
+                    "title": exam.title,
+                    "requires_registration": exam.requires_registration,
+                    "registration_start_date": exam.registration_start_date,
+                    "registration_end_date": exam.registration_end_date,
+                    "exam_start_date": exam.exam_start_date,
+                    "exam_end_date": exam.exam_end_date,
+                    "can_register": exam.status == 'registration_open' and not registration,
+                    "status": exam.status,
+                    "is_registered": bool(registration),
+                    "registration_status": "Sınav başlama tarihi bekleniyor" if registration else "Kayıt ol"
+                }
             exam_list.append(exam_data)
 
         return exam_list
@@ -68,17 +86,19 @@ def get_exam(
 
     # Admin değilse kontrolleri yap
     if current_user.role != "admin":
-        # Başvuru kontrolü
-        registration = db.query(ExamRegistration).filter(
-            ExamRegistration.user_id == current_user.id,
-            ExamRegistration.exam_id == exam_id
-        ).first()
+        # Başvurusuz sınavlar için özel kontrol
+        if exam.requires_registration:
+            # Başvuru kontrolü
+            registration = db.query(ExamRegistration).filter(
+                ExamRegistration.user_id == current_user.id,
+                ExamRegistration.exam_id == exam_id
+            ).first()
 
-        if not registration:
-            raise HTTPException(
-                status_code=403,
-                detail="Bu sınava erişmek için kayıt olmalısınız"
-            )
+            if not registration:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Bu sınava erişmek için kayıt olmalısınız"
+                )
 
         # Sınav durumu kontrolü
         if exam.status != 'exam_active':
@@ -110,7 +130,7 @@ def get_exam(
     }
 
 
-@router.post("/start-exam/{exam_id}")
+router.post("/start-exam/{exam_id}")
 def start_exam(
         exam_id: int,
         current_user: UserDB = Depends(get_current_user),
@@ -129,17 +149,18 @@ def start_exam(
                 detail="Sınav henüz başlamamış veya süresi dolmuş"
             )
 
-        # Başvuru kontrolü
-        registration = db.query(ExamRegistration).filter(
-            ExamRegistration.user_id == current_user.id,
-            ExamRegistration.exam_id == exam_id
-        ).first()
+        # Başvuru kontrolü - sadece başvurulu sınavlar için
+        if exam.requires_registration:
+            registration = db.query(ExamRegistration).filter(
+                ExamRegistration.user_id == current_user.id,
+                ExamRegistration.exam_id == exam_id
+            ).first()
 
-        if not registration and current_user.role != "admin":
-            raise HTTPException(
-                status_code=403,
-                detail="Bu sınavı başlatmak için önce kayıt olmalısınız"
-            )
+            if not registration and current_user.role != "admin":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Bu sınavı başlatmak için önce kayıt olmalısınız"
+                )
 
         # Mevcut sınav sonucu kontrolü
         existing_result = db.query(ExamResult).filter(

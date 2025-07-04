@@ -14,6 +14,7 @@ class ExamStatus(str, Enum):
 class ExamListResponse(BaseModel):
     id: int
     title: str
+    requires_registration: bool
     registration_start_date: datetime
     registration_end_date: datetime
     exam_start_date: datetime
@@ -55,11 +56,12 @@ class ExamResultResponse(BaseModel):
 
 class ExamCreateRequest(BaseModel):
     title: str
+    requires_registration: bool = True
     registration_start_date: datetime
     registration_end_date: datetime
     exam_start_date: datetime
     exam_end_date: Optional[datetime] = None
-    duration_minutes: int  # Yeni eklenen alan
+    duration_minutes: int
 
 class QuestionSCH(BaseModel):
     id: int
@@ -71,6 +73,7 @@ class ExamSCH(BaseModel):
     id: int
     title: str
     is_published: bool
+    requires_registration: bool
     registration_start_date: datetime
     registration_end_date: datetime
     exam_start_date: datetime

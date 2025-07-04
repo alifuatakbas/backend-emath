@@ -38,21 +38,35 @@ def create_exam(
         raise HTTPException(status_code=403, detail="Yetkiniz yok")
 
     try:
-        # Tarihleri UTC'ye çevir
-        exam = Exam(
-            title=request.title,
-            registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC),
-            registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC),
-            exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
-            exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
-            status='registration_pending'  # Başlangıç durumu
-        )
+        # Başvurusuz sınavlar için tarih kontrolü
+        if request.requires_registration:
+            # Tarihleri UTC'ye çevir
+            exam = Exam(
+                title=request.title,
+                requires_registration=request.requires_registration,
+                registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC),
+                registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC),
+                exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
+                exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
+                status='registration_pending'  # Başlangıç durumu
+            )
 
-        # Tarih kontrolü
-        if exam.registration_end_date > exam.exam_start_date:
-            raise HTTPException(
-                status_code=400,
-                detail="Başvuru bitiş tarihi sınav başlangıç tarihinden sonra olamaz"
+            # Tarih kontrolü
+            if exam.registration_end_date > exam.exam_start_date:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Başvuru bitiş tarihi sınav başlangıç tarihinden sonra olamaz"
+                )
+        else:
+            # Başvurusuz sınavlar için sadece sınav tarihleri
+            exam = Exam(
+                title=request.title,
+                requires_registration=request.requires_registration,
+                registration_start_date=None,
+                registration_end_date=None,
+                exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
+                exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
+                status='registration_pending'  # Başlangıç durumu
             )
 
         db.add(exam)
