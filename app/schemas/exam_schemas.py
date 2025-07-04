@@ -15,10 +15,10 @@ class ExamListResponse(BaseModel):
     id: int
     title: str
     requires_registration: bool
-    registration_start_date: datetime
-    registration_end_date: datetime
-    exam_start_date: datetime
-    exam_end_date: datetime
+    registration_start_date: Optional[datetime] = None  # Optional yapın
+    registration_end_date: Optional[datetime] = None    # Optional yapın
+    exam_start_date: Optional[datetime] = None          # Optional yapın
+    exam_end_date: Optional[datetime] = None            # Optional yapın
     can_register: bool
     status: str
     is_registered: bool
@@ -26,7 +26,6 @@ class ExamListResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
 class QuestionAnswerSubmission(BaseModel):
     question_id: int
     selected_option_id: int
@@ -57,11 +56,11 @@ class ExamResultResponse(BaseModel):
 class ExamCreateRequest(BaseModel):
     title: str
     requires_registration: bool = True
-    registration_start_date: datetime
-    registration_end_date: datetime
+    registration_start_date: Optional[datetime] = None  # Optional yapın
+    registration_end_date: Optional[datetime] = None    # Optional yapın
     exam_start_date: datetime
     exam_end_date: Optional[datetime] = None
-    duration_minutes: int
+    duration_minutes: Optional[int] = None  # Optional yapın
 
 class QuestionSCH(BaseModel):
     id: int

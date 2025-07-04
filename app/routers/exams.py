@@ -29,49 +29,52 @@ def get_exams(
 
         exam_list = []
         for exam in exams:
-            # Kayıt durumu kontrolü
-            registration = db.query(ExamRegistration).filter(
-                ExamRegistration.user_id == current_user.id,
-                ExamRegistration.exam_id == exam.id
-            ).first()
+            try:
+                # Kayıt durumu kontrolü
+                registration = db.query(ExamRegistration).filter(
+                    ExamRegistration.user_id == current_user.id,
+                    ExamRegistration.exam_id == exam.id
+                ).first()
 
-            # Başvurusuz sınavlar için özel durum
-            if not exam.requires_registration:
-                exam_data = {
-                    "id": exam.id,
-                    "title": exam.title,
-                    "requires_registration": exam.requires_registration,
-                    "registration_start_date": exam.registration_start_date,
-                    "registration_end_date": exam.registration_end_date,
-                    "exam_start_date": exam.exam_start_date,
-                    "exam_end_date": exam.exam_end_date,
-                    "can_register": False,  # Başvurusuz sınavlarda başvuru yok
-                    "status": exam.status,
-                    "is_registered": True,  # Başvurusuz sınavlarda otomatik kayıtlı sayılır
-                    "registration_status": "Başvuru gerekmez"
-                }
-            else:
-                # Normal başvurulu sınavlar
-                exam_data = {
-                    "id": exam.id,
-                    "title": exam.title,
-                    "requires_registration": exam.requires_registration,
-                    "registration_start_date": exam.registration_start_date,
-                    "registration_end_date": exam.registration_end_date,
-                    "exam_start_date": exam.exam_start_date,
-                    "exam_end_date": exam.exam_end_date,
-                    "can_register": exam.status == 'registration_open' and not registration,
-                    "status": exam.status,
-                    "is_registered": bool(registration),
-                    "registration_status": "Sınav başlama tarihi bekleniyor" if registration else "Kayıt ol"
-                }
-            exam_list.append(exam_data)
+                # Başvurusuz sınavlar için özel durum
+                if not exam.requires_registration:
+                    exam_data = {
+                        "id": exam.id,
+                        "title": exam.title,
+                        "requires_registration": exam.requires_registration,
+                        "registration_start_date": exam.registration_start_date,
+                        "registration_end_date": exam.registration_end_date,
+                        "exam_start_date": exam.exam_start_date,
+                        "exam_end_date": exam.exam_end_date,
+                        "can_register": False,
+                        "status": exam.status,
+                        "is_registered": True,
+                        "registration_status": "Başvuru gerekmez"
+                    }
+                else:
+                    # Normal başvurulu sınavlar
+                    exam_data = {
+                        "id": exam.id,
+                        "title": exam.title,
+                        "requires_registration": exam.requires_registration,
+                        "registration_start_date": exam.registration_start_date,
+                        "registration_end_date": exam.registration_end_date,
+                        "exam_start_date": exam.exam_start_date,
+                        "exam_end_date": exam.exam_end_date,
+                        "can_register": exam.status == 'registration_open' and not registration,
+                        "status": exam.status,
+                        "is_registered": bool(registration),
+                        "registration_status": "Sınav başlama tarihi bekleniyor" if registration else "Kayıt ol"
+                    }
+                exam_list.append(exam_data)
+            except Exception as exam_error:
+                print(f"Error processing exam {exam.id}: {str(exam_error)}")
+                continue
 
         return exam_list
     except Exception as e:
         print(f"Error in get_exams: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @router.get("/exams/{exam_id}")

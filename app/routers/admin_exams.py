@@ -41,25 +41,17 @@ def create_exam(
     try:
         # Başvurusuz sınavlar için tarih kontrolü
         if request.requires_registration:
-            # Tarihleri UTC'ye çevir
             exam = Exam(
                 title=request.title,
                 requires_registration=request.requires_registration,
-                registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC),
-                registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC),
+                registration_start_date=request.registration_start_date.replace(tzinfo=pytz.UTC) if request.registration_start_date else None,
+                registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC) if request.registration_end_date else None,
                 exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
                 exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
-                status='registration_pending'  # Başlangıç durumu
+                status='registration_pending'
             )
-
-            # Tarih kontrolü
-            if exam.registration_end_date > exam.exam_start_date:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Başvuru bitiş tarihi sınav başlangıç tarihinden sonra olamaz"
-                )
         else:
-            # Başvurusuz sınavlar için sadece sınav tarihleri
+            # Başvurusuz sınavlar için
             exam = Exam(
                 title=request.title,
                 requires_registration=request.requires_registration,
@@ -67,30 +59,20 @@ def create_exam(
                 registration_end_date=None,
                 exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
                 exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
-                status='registration_pending'  # Başlangıç durumu
+                status='registration_pending'
             )
 
         db.add(exam)
         db.commit()
         db.refresh(exam)
 
-        # Otomatik işlemleri zamanla
-        schedule_exam_events(
-            exam_id=exam.id,
-            registration_start=exam.registration_start_date,
-            registration_end=exam.registration_end_date,
-            exam_start=exam.exam_start_date,
-            exam_end=exam.exam_end_date if exam.exam_end_date else exam.exam_start_date
-        )
-
         return {
-            "message": "Sınav oluşturuldu ve zamanlandı",
+            "message": "Sınav oluşturuldu",
             "exam_id": exam.id
         }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-
 
 
 # Dosya yükleme için güvenli bir yol oluştur
