@@ -28,6 +28,7 @@ class ExamCreateRequest(BaseModel):
     registration_end_date: datetime | None = None
     exam_start_date: datetime
     exam_end_date: datetime | None = None
+    duration_minutes: int = 60  # Kullanıcının sınavı çözmek için kullandığı süre (dakika)
 
 @router.post("/create-exam")
 def create_exam(
@@ -48,6 +49,7 @@ def create_exam(
                 registration_end_date=request.registration_end_date.replace(tzinfo=pytz.UTC) if request.registration_end_date else None,
                 exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
                 exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
+                duration_minutes=request.duration_minutes,
                 status='registration_pending'
             )
         else:
@@ -59,6 +61,7 @@ def create_exam(
                 registration_end_date=None,
                 exam_start_date=request.exam_start_date.replace(tzinfo=pytz.UTC),
                 exam_end_date=request.exam_end_date.replace(tzinfo=pytz.UTC) if request.exam_end_date else None,
+                duration_minutes=request.duration_minutes,
                 status='registration_pending'
             )
 

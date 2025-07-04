@@ -14,6 +14,7 @@ class Exam(Base):
     registration_end_date = Column(DateTime(timezone=True), nullable=True)
     exam_start_date = Column(DateTime(timezone=True), nullable=True)
     exam_end_date = Column(DateTime(timezone=True), nullable=True)
+    duration_minutes = Column(Integer, default=60)  # Kullanıcının sınavı çözmek için kullandığı süre
     status = Column(String(50), default="registration_pending")
 
     questions = relationship("Question", back_populates="exam")

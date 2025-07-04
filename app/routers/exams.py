@@ -36,6 +36,9 @@ def get_exams(
                     ExamRegistration.exam_id == exam.id
                 ).first()
 
+                # Sınav süresini exam.duration_minutes'tan al
+                exam_duration = exam.duration_minutes
+
                 # Başvurusuz sınavlar için özel durum
                 if not exam.requires_registration:
                     exam_data = {
@@ -46,6 +49,7 @@ def get_exams(
                         "registration_end_date": exam.registration_end_date,
                         "exam_start_date": exam.exam_start_date,
                         "exam_end_date": exam.exam_end_date,
+                        "exam_duration": exam_duration,  # Sınav süresini ekle
                         "can_register": False,
                         "status": exam.status,
                         "is_registered": True,
@@ -61,6 +65,7 @@ def get_exams(
                         "registration_end_date": exam.registration_end_date,
                         "exam_start_date": exam.exam_start_date,
                         "exam_end_date": exam.exam_end_date,
+                        "exam_duration": exam_duration,  # Sınav süresini ekle
                         "can_register": exam.status == 'registration_open' and not registration,
                         "status": exam.status,
                         "is_registered": bool(registration),
@@ -129,7 +134,9 @@ def get_exam(
     return {
         "id": exam.id,
         "title": exam.title,
-        "questions": questions
+        "questions": questions,
+        "duration_minutes": exam.duration_minutes,
+        "has_been_taken": False  # Bu alan frontend'de kullanılıyor
     }
 
 
@@ -191,9 +198,8 @@ def start_exam(
         # Yeni sınav başlat
         start_time = datetime.utcnow()
 
-        # Sınav süresini hesapla (başlangıç ve bitiş arasındaki fark)
-        exam_duration = (exam.exam_end_date - exam.exam_start_date).total_seconds() / 60
-        exam_duration = int(exam_duration)  # Dakikaya çevir
+        # Sınav süresini exam.duration_minutes'tan al
+        exam_duration = exam.duration_minutes
 
         end_time = start_time + timedelta(minutes=exam_duration)
 
@@ -543,13 +549,18 @@ def get_public_exams(
 
         exam_list = []
         for exam in exams:
+            # Sınav süresini exam.duration_minutes'tan al
+            exam_duration = exam.duration_minutes
+
             exam_data = {
                 "id": exam.id,
                 "title": exam.title,
+                "requires_registration": exam.requires_registration,
                 "registration_start_date": exam.registration_start_date,
                 "registration_end_date": exam.registration_end_date,
                 "exam_start_date": exam.exam_start_date,
                 "exam_end_date": exam.exam_end_date,
+                "exam_duration": exam_duration,  # Sınav süresini ekle
                 "can_register": exam.status == 'registration_open',
                 "status": exam.status,
                 "is_registered": False,  # Giriş yapmamış kullanıcı için her zaman False

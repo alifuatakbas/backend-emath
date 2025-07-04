@@ -19,6 +19,7 @@ class ExamListResponse(BaseModel):
     registration_end_date: Optional[datetime] = None    # Optional yapın
     exam_start_date: Optional[datetime] = None          # Optional yapın
     exam_end_date: Optional[datetime] = None            # Optional yapın
+    exam_duration: Optional[int] = None                 # Kullanıcının sınavı çözmek için kullandığı süre (dakika)
     can_register: bool
     status: str
     is_registered: bool
