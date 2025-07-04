@@ -12,12 +12,10 @@ router = APIRouter()
 User = UserDB
 
 
-
-
 @router.get("/exams", response_model=List[ExamListResponse])
 def get_exams(
-    current_user: UserDB = Depends(get_current_user),
-    db: Session = Depends(get_db)
+        current_user: UserDB = Depends(get_current_user),
+        db: Session = Depends(get_db)
 ):
     try:
         if current_user.role == "admin":
@@ -28,8 +26,48 @@ def get_exams(
             ).all()
 
         exam_list = []
+        current_time = datetime.utcnow().replace(tzinfo=pytz.UTC)
+
         for exam in exams:
             try:
+                # Sınav durumunu otomatik kontrol et ve güncelle
+                exam_updated = False
+
+                # Başvurusuz sınavlar için durum kontrolü
+                if not exam.requires_registration:
+                    if exam.exam_start_date and current_time >= exam.exam_start_date:
+                        if exam.status != 'exam_active':
+                            exam.status = 'exam_active'
+                            exam_updated = True
+                    elif exam.exam_start_date and current_time < exam.exam_start_date:
+                        if exam.status != 'registration_pending':
+                            exam.status = 'registration_pending'
+                            exam_updated = True
+
+                # Başvurulu sınavlar için durum kontrolü
+                else:
+                    if exam.registration_start_date and exam.registration_end_date and exam.exam_start_date:
+                        if current_time < exam.registration_start_date:
+                            if exam.status != 'registration_pending':
+                                exam.status = 'registration_pending'
+                                exam_updated = True
+                        elif exam.registration_start_date <= current_time <= exam.registration_end_date:
+                            if exam.status != 'registration_open':
+                                exam.status = 'registration_open'
+                                exam_updated = True
+                        elif exam.registration_end_date < current_time < exam.exam_start_date:
+                            if exam.status != 'registration_closed':
+                                exam.status = 'registration_closed'
+                                exam_updated = True
+                        elif current_time >= exam.exam_start_date:
+                            if exam.status != 'exam_active':
+                                exam.status = 'exam_active'
+                                exam_updated = True
+
+                # Değişiklik varsa kaydet
+                if exam_updated:
+                    db.commit()
+
                 # Kayıt durumu kontrolü
                 registration = db.query(ExamRegistration).filter(
                     ExamRegistration.user_id == current_user.id,
