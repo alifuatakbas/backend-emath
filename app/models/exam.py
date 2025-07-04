@@ -14,13 +14,13 @@ class Exam(Base):
     registration_end_date = Column(DateTime(timezone=True), nullable=True)
     exam_start_date = Column(DateTime(timezone=True), nullable=True)
     exam_end_date = Column(DateTime(timezone=True), nullable=True)
+    duration_minutes = Column(Integer, nullable=True)  # Yeni eklenen alan
     status = Column(String(50), default="registration_pending")
 
     questions = relationship("Question", back_populates="exam")
     exam_results = relationship("ExamResult", back_populates="exam")
     registrations = relationship("ExamRegistration", back_populates="exam")
     question_counter = Column(Integer, default=0)
-    # Yeni eklenen soru sayısını tutmak için
 
 
 class Question(Base):
