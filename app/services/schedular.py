@@ -196,9 +196,7 @@ def get_exam_status(exam, current_time: datetime = None) -> str:
 
     # Başvurusuz sınavlar için özel mantık
     if not exam.requires_registration:
-        if current_time < exam.exam_start_date:
-            return "registration_pending"
-        elif current_time <= exam.exam_end_date:
+        if current_time <= exam.exam_end_date:
             return "exam_active"
         else:
             return "completed"
@@ -251,48 +249,55 @@ def init_scheduler():
                 print(f"  Requires registration: {exam.requires_registration}")
                 print(f"  Exam start: {exam.exam_start_date}")
                 print(f"  Exam end: {exam.exam_end_date}")
+                print(f"  Current time: {current_time}")
+                print(f"  Exam end > current: {exam.exam_end_date > current_time if exam.exam_end_date else 'No end date'}")
                 
-                # Sadece gelecekteki olayları zamanla
-                if exam.exam_end_date and exam.exam_end_date > current_time:
-                    print(f"  Exam {exam.id} has future events")
+                # Başvurusuz sınavlar için özel kontrol
+                if not exam.requires_registration:
+                    print(f"  Exam {exam.id} is no-registration exam")
                     
-                    # Başvurusuz sınavlar için özel kontrol
-                    if not exam.requires_registration:
-                        print(f"  Exam {exam.id} is no-registration exam")
-                        # Başvurusuz sınavlar için sadece sınav başlangıç ve bitiş zamanlarını ayarla
-                        if exam.exam_start_date and exam.exam_start_date > current_time:
-                            scheduler.add_job(
-                                update_exam_status,
-                                'date',
-                                run_date=exam.exam_start_date,
-                                args=[exam.id, 'exam_active'],
-                                id=f'exam_{exam.id}_start',
-                                replace_existing=True
-                            )
-                            print(f"  Başvurusuz sınav {exam.id} başlangıcı zamanlandı: {exam.exam_start_date}")
-                        
-                        if exam.exam_end_date and exam.exam_end_date > current_time:
-                            scheduler.add_job(
-                                update_exam_status,
-                                'date',
-                                run_date=exam.exam_end_date,
-                                args=[exam.id, 'completed'],
-                                id=f'exam_{exam.id}_end',
-                                replace_existing=True
-                            )
-                            print(f"  Başvurusuz sınav {exam.id} bitişi zamanlandı: {exam.exam_end_date}")
-                    else:
-                        print(f"  Exam {exam.id} is registration exam")
-                        # Normal başvurulu sınavlar için tüm zamanlamaları yap
-                        schedule_exam_events(
-                            exam_id=exam.id,
-                            registration_start=exam.registration_start_date,
-                            registration_end=exam.registration_end_date,
-                            exam_start=exam.exam_start_date,
-                            exam_end=exam.exam_end_date
+                    # Başvurusuz sınavlar için sadece bitiş tarihi için job zamanla
+                    # Başlangıç tarihi geçmişte olsa bile sınav aktif olabilir
+                    if exam.exam_end_date and exam.exam_end_date > current_time:
+                        scheduler.add_job(
+                            update_exam_status,
+                            'date',
+                            run_date=exam.exam_end_date,
+                            args=[exam.id, 'completed'],
+                            id=f'exam_{exam.id}_end',
+                            replace_existing=True
                         )
+                        print(f"  Başvurusuz sınav {exam.id} bitişi zamanlandı: {exam.exam_end_date}")
+                    else:
+                        print(f"  Exam {exam.id} end date is not in future: {exam.exam_end_date}")
+                        
+                    # Eğer sınav başlangıç tarihi gelecekte ise, başlangıç job'ı da ekle
+                    if exam.exam_start_date and exam.exam_start_date > current_time:
+                        scheduler.add_job(
+                            update_exam_status,
+                            'date',
+                            run_date=exam.exam_start_date,
+                            args=[exam.id, 'exam_active'],
+                            id=f'exam_{exam.id}_start',
+                            replace_existing=True
+                        )
+                        print(f"  Başvurusuz sınav {exam.id} başlangıcı zamanlandı: {exam.exam_start_date}")
+                    else:
+                        print(f"  Exam {exam.id} start date is not in future: {exam.exam_start_date}")
+                        
+                # Başvurulu sınavlar için normal kontrol
+                elif exam.exam_end_date and exam.exam_end_date > current_time:
+                    print(f"  Exam {exam.id} is registration exam")
+                    # Normal başvurulu sınavlar için tüm zamanlamaları yap
+                    schedule_exam_events(
+                        exam_id=exam.id,
+                        registration_start=exam.registration_start_date,
+                        registration_end=exam.registration_end_date,
+                        exam_start=exam.exam_start_date,
+                        exam_end=exam.exam_end_date
+                    )
                 else:
-                    print(f"  Exam {exam.id} has no future events")
+                    print(f"  Exam {exam.id} has no future events - end date: {exam.exam_end_date}, current: {current_time}")
         except Exception as e:
             print(f"Mevcut sınavları kontrol ederken hata: {e}")
             import traceback
