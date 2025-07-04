@@ -132,53 +132,88 @@ def schedule_exam_events(exam_id: int,
     Sınav için tüm otomatik işlemleri zamanlar
     """
     try:
-        # Başvuru başlangıcı için zamanlama (sadece None değilse)
-        if registration_start:
-            scheduler.add_job(
-                update_exam_status,
-                'date',
-                run_date=registration_start,
-                args=[exam_id, 'registration_open'],
-                id=f'exam_{exam_id}_reg_start',
-                replace_existing=True
-            )
-            print(f"Sınav {exam_id} başvuru başlangıcı zamanlandı: {registration_start}")
+        current_time = datetime.utcnow()
+        
+        # Başvurusuz sınavlar için özel mantık
+        if not registration_start and not registration_end:
+            print(f"Sınav {exam_id} başvurusuz sınav - özel zamanlama")
+            
+            # Sadece gelecekteki olayları zamanla
+            if exam_start and exam_start > current_time:
+                scheduler.add_job(
+                    update_exam_status,
+                    'date',
+                    run_date=exam_start,
+                    args=[exam_id, 'exam_active'],
+                    id=f'exam_{exam_id}_start',
+                    replace_existing=True
+                )
+                print(f"Başvurusuz sınav {exam_id} başlangıcı zamanlandı: {exam_start}")
+            else:
+                print(f"Başvurusuz sınav {exam_id} başlangıç tarihi geçmişte: {exam_start}")
+            
+            if exam_end and exam_end > current_time:
+                scheduler.add_job(
+                    update_exam_status,
+                    'date',
+                    run_date=exam_end,
+                    args=[exam_id, 'completed'],
+                    id=f'exam_{exam_id}_end',
+                    replace_existing=True
+                )
+                print(f"Başvurusuz sınav {exam_id} bitişi zamanlandı: {exam_end}")
+            else:
+                print(f"Başvurusuz sınav {exam_id} bitiş tarihi geçmişte: {exam_end}")
+                
+        else:
+            # Başvurulu sınavlar için normal mantık
+            # Başvuru başlangıcı için zamanlama (sadece None değilse)
+            if registration_start:
+                scheduler.add_job(
+                    update_exam_status,
+                    'date',
+                    run_date=registration_start,
+                    args=[exam_id, 'registration_open'],
+                    id=f'exam_{exam_id}_reg_start',
+                    replace_existing=True
+                )
+                print(f"Sınav {exam_id} başvuru başlangıcı zamanlandı: {registration_start}")
 
-        # Başvuru bitişi için zamanlama (sadece None değilse)
-        if registration_end:
-            scheduler.add_job(
-                update_exam_status,
-                'date',
-                run_date=registration_end,
-                args=[exam_id, 'registration_closed'],
-                id=f'exam_{exam_id}_reg_end',
-                replace_existing=True
-            )
-            print(f"Sınav {exam_id} başvuru bitişi zamanlandı: {registration_end}")
+            # Başvuru bitişi için zamanlama (sadece None değilse)
+            if registration_end:
+                scheduler.add_job(
+                    update_exam_status,
+                    'date',
+                    run_date=registration_end,
+                    args=[exam_id, 'registration_closed'],
+                    id=f'exam_{exam_id}_reg_end',
+                    replace_existing=True
+                )
+                print(f"Sınav {exam_id} başvuru bitişi zamanlandı: {registration_end}")
 
-        # Sınav başlangıcı için zamanlama
-        if exam_start:
-            scheduler.add_job(
-                update_exam_status,
-                'date',
-                run_date=exam_start,
-                args=[exam_id, 'exam_active'],
-                id=f'exam_{exam_id}_start',
-                replace_existing=True
-            )
-            print(f"Sınav {exam_id} başlangıcı zamanlandı: {exam_start}")
+            # Sınav başlangıcı için zamanlama
+            if exam_start:
+                scheduler.add_job(
+                    update_exam_status,
+                    'date',
+                    run_date=exam_start,
+                    args=[exam_id, 'exam_active'],
+                    id=f'exam_{exam_id}_start',
+                    replace_existing=True
+                )
+                print(f"Sınav {exam_id} başlangıcı zamanlandı: {exam_start}")
 
-        # Sınav bitişi için zamanlama
-        if exam_end:
-            scheduler.add_job(
-                update_exam_status,
-                'date',
-                run_date=exam_end,
-                args=[exam_id, 'completed'],
-                id=f'exam_{exam_id}_end',
-                replace_existing=True
-            )
-            print(f"Sınav {exam_id} bitişi zamanlandı: {exam_end}")
+            # Sınav bitişi için zamanlama
+            if exam_end:
+                scheduler.add_job(
+                    update_exam_status,
+                    'date',
+                    run_date=exam_end,
+                    args=[exam_id, 'completed'],
+                    id=f'exam_{exam_id}_end',
+                    replace_existing=True
+                )
+                print(f"Sınav {exam_id} bitişi zamanlandı: {exam_end}")
 
     except Exception as e:
         print(f"Sınav zamanlama işleminde hata: {e}")
@@ -255,6 +290,14 @@ def init_scheduler():
                 # Başvurusuz sınavlar için özel kontrol
                 if not exam.requires_registration:
                     print(f"  Exam {exam.id} is no-registration exam")
+                    
+                    # Eğer sınav başlangıç tarihi geçmişte ve sınav hala registration_pending durumundaysa
+                    # sınavı otomatik olarak exam_active yap
+                    if (exam.exam_start_date and exam.exam_start_date <= current_time and 
+                        exam.status == 'registration_pending' and 
+                        exam.exam_end_date and exam.exam_end_date > current_time):
+                        print(f"  Exam {exam.id} başlangıç tarihi geçmiş, sınavı aktif yapıyor: {exam.exam_start_date}")
+                        update_exam_status(exam.id, 'exam_active')
                     
                     # Başvurusuz sınavlar için sadece bitiş tarihi için job zamanla
                     # Başlangıç tarihi geçmişte olsa bile sınav aktif olabilir

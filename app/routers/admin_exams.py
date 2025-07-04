@@ -66,6 +66,19 @@ def create_exam(
         db.commit()
         db.refresh(exam)
 
+        # Sınav için scheduler job'larını ekle
+        try:
+            schedule_exam_events(
+                exam_id=exam.id,
+                registration_start=exam.registration_start_date,
+                registration_end=exam.registration_end_date,
+                exam_start=exam.exam_start_date,
+                exam_end=exam.exam_end_date
+            )
+            print(f"Yeni sınav {exam.id} için scheduler job'ları eklendi")
+        except Exception as e:
+            print(f"Scheduler job'ları eklenirken hata: {e}")
+
         return {
             "message": "Sınav oluşturuldu",
             "exam_id": exam.id
